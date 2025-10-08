@@ -1,0 +1,252 @@
+openapi: 3.1.0
+info:
+  title: Daily Tracker API
+  version: 0.1.0
+  description: API documentation for asset tracking & alerts
+servers:
+  - url: /api
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+                  time: { type: string, format: date-time }
+  /assets:
+    get:
+      summary: List assets (paginated)
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1 }
+        - in: query
+          name: pageSize
+          schema: { type: integer, minimum: 1 }
+        - in: query
+          name: sortBy
+          schema: { type: string, enum: [name, symbol, createdAt] }
+        - in: query
+          name: sortDir
+          schema: { type: string, enum: [asc, desc] }
+        - in: query
+          name: q
+          schema: { type: string }
+        - in: query
+          name: symbolExact
+          schema: { type: string }
+      responses:
+        '200':
+          description: Asset list or duplicate check result
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/Asset' }
+                      page: { type: integer }
+                      pageSize: { type: integer }
+                      total: { type: integer }
+                      totalPages: { type: integer }
+                      sortBy: { type: string }
+                      sortDir: { type: string }
+                  - type: object
+                    properties:
+                      exists: { type: boolean }
+                      asset: { $ref: '#/components/schemas/Asset' }
+    post:
+      summary: Create asset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetCreate'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Asset' }
+  /assets/{id}:
+    put:
+      summary: Update asset
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetUpdate'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Asset' }
+    delete:
+      summary: Delete asset
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+  /assets/batch:
+    post:
+      summary: Batch CSV import
+      requestBody:
+        required: true
+        content:
+          text/plain:
+            schema:
+              type: string
+      responses:
+        '201':
+          description: Imported
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  imported: { type: integer }
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Asset' }
+  /quotes/current:
+    get:
+      summary: Current quotes for all assets (latest snapshot)
+      responses:
+        '200':
+          description: Array of quote snapshots
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/QuoteSnapshot' }
+  /quotes/{id}/history:
+    get:
+      summary: Historical snapshots for asset
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: Array of snapshots
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/QuoteSnapshot' }
+  /alerts/history:
+    get:
+      summary: Alert history
+      parameters:
+        - in: query
+          name: symbol
+          schema: { type: string }
+        - in: query
+          name: boundary
+          schema: { type: string, enum: [upper, lower] }
+        - in: query
+          name: page
+          schema: { type: integer }
+        - in: query
+          name: pageSize
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Paginated alert history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/AlertHistory' }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+                  total: { type: integer }
+                  totalPages: { type: integer }
+  /admin/fetch-now:
+    post:
+      summary: Manually trigger fetch cycle (non-production)
+      responses:
+        '200':
+          description: Cycle run started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+components:
+  schemas:
+    Asset:
+      type: object
+      properties:
+        _id: { type: string }
+        name: { type: string }
+        symbol: { type: string }
+        providerSymbol: { type: string }
+        upperThreshold: { type: number, nullable: true }
+        lowerThreshold: { type: number, nullable: true }
+    AssetCreate:
+      type: object
+      required: [name, symbol, providerSymbol]
+      properties:
+        name: { type: string }
+        symbol: { type: string }
+        providerSymbol: { type: string }
+        upperThreshold: { type: number }
+        lowerThreshold: { type: number }
+    AssetUpdate:
+      type: object
+      properties:
+        name: { type: string }
+        upperThreshold: { type: number }
+        lowerThreshold: { type: number }
+    QuoteSnapshot:
+      type: object
+      properties:
+        assetId: { type: string }
+        symbol: { type: string }
+        name: { type: string }
+        price: { type: number }
+        changePercent: { type: number }
+        takenAt: { type: string, format: date-time }
+    AlertHistory:
+      type: object
+      properties:
+        symbol: { type: string }
+        boundary: { type: string }
+        price: { type: number }
+        threshold: { type: number }
+        triggeredAt: { type: string, format: date-time }
