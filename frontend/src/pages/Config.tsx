@@ -108,7 +108,59 @@ export const ConfigPage: React.FC = () => {
               toast.push('Import failed', 'error');
             }
         }} className="bg-indigo-600 px-3 py-2 rounded">Upload</button>
+        <button onClick={async () => {
+          try {
+            // Fetch all assets ignoring pagination (iterate pages)
+            let all: Asset[] = [];
+            let currentPage = 1;
+            let pages = 1;
+            do {
+              // request large page size to minimize loops
+              const res = await getAssets({ page: currentPage, pageSize: 200, sortBy, sortDir, q: query || undefined });
+              if (Array.isArray(res)) {
+                all = res; // non-paginated mode
+                pages = 1;
+                break;
+              } else {
+                all = all.concat(res.data);
+                pages = res.totalPages;
+              }
+              currentPage++;
+            } while (currentPage <= pages);
+
+            const headers = ['name','symbol','providerSymbol','upperThreshold','lowerThreshold','unit','currency'];
+            const lines = [headers.join(',')];
+            for (const a of all) {
+              const row = [
+                a.name ?? '',
+                a.symbol ?? '',
+                a.providerSymbol ?? '',
+                a.upperThreshold != null ? String(a.upperThreshold) : '',
+                a.lowerThreshold != null ? String(a.lowerThreshold) : '',
+                a.unit ?? '',
+                a.currency ?? ''
+              ];
+              // basic CSV escape (wrap if contains comma or quote)
+              const safe = row.map(v => /[",\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v);
+              lines.push(safe.join(','));
+            }
+            const blob = new Blob([lines.join('\n') + '\n'], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const aEl = document.createElement('a');
+            aEl.href = url;
+            const ts = new Date().toISOString().replace(/[:T]/g,'-').slice(0,19);
+            aEl.download = `assets-export-${ts}.csv`;
+            document.body.appendChild(aEl);
+            aEl.click();
+            document.body.removeChild(aEl);
+            URL.revokeObjectURL(url);
+            toast.push(`Exported ${all.length} assets`, 'success');
+          } catch (err:any) {
+            toast.push('Export failed', 'error');
+          }
+        }} className="bg-gray-700 px-3 py-2 rounded">Export</button>
       </div>
+      <div className="text-[10px] opacity-60 -mt-2">Export format matches import headers: name,symbol,providerSymbol,upperThreshold,lowerThreshold,unit,currency</div>
       {loading && <div className="text-sm opacity-60">Loading...</div>}
       <div className="space-y-2">
         {assets.map(a => (

@@ -3,6 +3,8 @@ export interface Asset {
   name: string;
   symbol: string;
   providerSymbol: string;
+  unit?: string;
+  currency?: string;
   upperThreshold?: number;
   lowerThreshold?: number;
   lastAlertedAt?: string;
