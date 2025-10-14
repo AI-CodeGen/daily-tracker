@@ -1,20 +1,27 @@
 import cron from 'node-cron';
-import Asset from '../models/Asset.js';
+import { createLogger } from "../config/logger.js";
+const Logger = createLogger(import.meta.url);
 import Snapshot from '../models/Snapshot.js';
 import { fetchQuote } from './fetch.service.js';
 import { sendThresholdAlert } from './alert.service.js';
 import { alertEmitter } from '../events/alertEmitter.js';
 import AlertHistory from '../models/AlertHistory.js';
+import Asset from '../models/Asset.js';
 
 const COOLDOWN_MS = 1000 * 60 * 60 * 2; // 2 hours
 
 async function processAsset(asset) {
+  Logger.debug(`processAsset :: processing asset - ${JSON.stringify(asset)}`)
   try {
     const quote = await fetchQuote(asset.providerSymbol);
+    // Create a snapshot of the current price
     const snap = await Snapshot.create({
       asset: asset._id,
+      name: asset.name,
       price: quote.price,
       changePercent: quote.changePercent,
+      unit: asset.unit,
+      takenAt: new Date(),
       raw: quote.raw,
     });
 
@@ -29,6 +36,7 @@ async function processAsset(asset) {
       const now = Date.now();
       const last = asset.lastAlertedAt ? asset.lastAlertedAt.getTime() : 0;
       if (now - last > COOLDOWN_MS) {
+        Logger.info(`processAsset :: Sending alert for asset ${asset.name} - ${asset.symbol} at price ${quote.price}`);
         await sendThresholdAlert(asset, quote.price, alertBoundary);
         asset.lastAlertedAt = new Date();
         await asset.save();
@@ -62,10 +70,11 @@ async function processAsset(asset) {
 }
 
 export async function runCycle() {
-  console.log('[Scheduler] Running fetch cycle (manual)', new Date().toISOString());
+  Logger.info('[Scheduler] Running fetch cycle (manual)', new Date().toISOString());
   const assets = await Asset.find();
+  Logger.debug(`runCycle :: fetched assets to process - ${JSON.stringify(assets)}`);
+  
   for (const asset of assets) {
-    // eslint-disable-next-line no-await-in-loop
     await processAsset(asset);
   }
 }
@@ -75,5 +84,5 @@ export function startScheduler() {
   cron.schedule(expr, async () => {
     await runCycle();
   }, { timezone: 'UTC' });
-  console.log('Scheduler started with expr', expr);
+  Logger.info('Scheduler started with expr', expr);
 }

@@ -1,10 +1,12 @@
 import Joi from 'joi';
-import Asset from '../models/Asset.js';
+import { createLogger } from "../config/logger.js";
+const Logger = createLogger(import.meta.url);
 
 const assetSchema = Joi.object({
   name: Joi.string().required(),
   symbol: Joi.string().alphanum().min(2).max(12).required(),
   providerSymbol: Joi.string().required(),
+  unit: Joi.string().optional().allow(''),
   upperThreshold: Joi.number().optional().allow(null),
   lowerThreshold: Joi.number().optional().allow(null),
 });

@@ -1,4 +1,5 @@
-import AlertHistory from '../models/AlertHistory.js';
+import { createLogger } from "../config/logger.js";
+const Logger = createLogger(import.meta.url);
 
 // GET /api/alerts/history?assetId=&symbol=&boundary=upper|lower&page=1&pageSize=20
 export async function listAlerts(req, res, next) {

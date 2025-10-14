@@ -16,5 +16,6 @@ export interface QuoteSnapshot {
   name: string;
   price: number;
   changePercent?: number;
+  unit?: string;
   takenAt: string;
 }

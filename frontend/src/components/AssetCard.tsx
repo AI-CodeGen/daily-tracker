@@ -32,7 +32,10 @@ export const AssetCard: React.FC<Props> = ({ quote }) => {
         <h3 className="font-semibold">{quote.name}</h3>
         <span className={`text-sm ${color}`}>{quote.changePercent?.toFixed(2)}%</span>
       </div>
-      <div className="text-2xl font-bold">{quote.price}</div>
+      <div className="text-2xl font-bold">
+        {quote.price}
+        {quote.unit && <span className="text-base font-normal text-gray-400 ml-2">{quote.unit}</span>}
+      </div>
       <div className="h-14">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={history}>

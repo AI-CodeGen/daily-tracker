@@ -1,94 +1,13 @@
 // Service responsible for fetching data from provider (Yahoo Finance style)
 import axios from "axios";
 import yahooFinance from "yahoo-finance2";
-import Logger from "../config/logger.js";
-import puppeteer from "puppeteer";
-import * as cheerio from "cheerio";
+import { createLogger } from "../config/logger.js";
+const Logger = createLogger(import.meta.url);
 
 // Decide provider at runtime (default Alpha Vantage). We intentionally DO NOT
 // read and cache the API key at module load time because dotenv may not yet be
 // initialized when this file is imported. Always read from process.env inside
 // the function so a later dotenv.config() call is honored.
-
-export async function fetchGoldPrice_MoneyControl(date) {
-  // Check if date is present and formatted as YYYY-MM-DD
-  if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    Logger.error(`Invalid date format in ${date}, expected YYYY-MM-DD`);
-    throw new Error("Invalid date format, expected YYYY-MM-DD");
-  }
-  // date was not present, take current date formatted as YYYY-MM-DD
-  date = Date.now().toISOString().slice(0, 10);
-  Logger.info(`Checking Gold Price for date: ${date}`);
-  
-  let result = await fetch(
-    "https://priceapi.moneycontrol.com/pricefeed/mcx/commodityfutures/GOLD?expiry=2025-12-05",
-    {
-      headers: {
-        accept: "application/json, text/plain, */*",
-        "accept-language": "en-IN,en-GB;q=0.9,en-US;q=0.8,en;q=0.7",
-        "if-none-match": "924D097B0E1954C448B3494B77396E95",
-        priority: "u=1, i",
-        "sec-ch-ua":
-          '"Google Chrome";v="141", "Not?A_Brand";v="8", "Chromium";v="141"',
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": '"macOS"',
-        "sec-fetch-dest": "empty",
-        "sec-fetch-mode": "cors",
-        "sec-fetch-site": "same-site",
-        Referer: "https://www.moneycontrol.com/",
-      },
-      body: null,
-      method: "GET",
-    }
-  );
-  if (!result.ok) {
-    Logger.error(`MoneyControl API fetch failed with status ${result.status}`);
-    throw new Error("Failed to fetch gold price from MoneyControl");
-  }
-  const data = await result.json();
-  Logger.info(`MoneyControl Gold API response: ${JSON.stringify(data)}`);
-
-  const price = data.data.avgPrice;
-  const unit = data.data.priceUnit;
-  const changePercent = parseFloat(data.data.perChange) || 0;
-  Logger.info(`Fetched Gold Price from MoneyControl: ${price} per ${unit}`);
-  return {
-    price,
-    unit,
-    changePercent,
-    raw: data,
-  };
-}
-
-export async function MCX_Market_Watch(params) {
-  let market_values = await fetch(
-    "https://www.mcxindia.com/backpage.aspx/GetMarketWatch",
-    {
-      headers: {
-        accept: "application/json, text/javascript, */*; q=0.01",
-        "accept-language": "en-IN,en-GB;q=0.9,en-US;q=0.8,en;q=0.7",
-        "content-type": "application/json",
-        "sec-ch-ua":
-          '"Google Chrome";v="141", "Not?A_Brand";v="8", "Chromium";v="141"',
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": '"macOS"',
-        "sec-fetch-dest": "empty",
-        "sec-fetch-mode": "cors",
-        "sec-fetch-site": "same-origin",
-        "x-requested-with": "XMLHttpRequest",
-        cookie:
-          "ASP.NET_SessionId=eeom5exrttj4tgml4pypevwh; _gid=GA1.2.910112827.1760453798; _ga=GA1.1.1061824458.1760453798; _ga_8BQ43G0902=GS2.1.s1760455747$o2$g0$t1760455747$j60$l0$h0",
-        Referer: "https://www.mcxindia.com/market-data/market-watch",
-      },
-      body: null,
-      method: "POST",
-    }
-  );
-  market_values = await market_values.json();
-  Logger.info(
-    `MCX Market Watch API response: ${JSON.stringify(market_values)}`
-  );
-}
 
 // Basic fetch using rapid API style (placeholder) -- adjust with real endpoint or yfinance proxy
 export async function fetchQuote(providerSymbol) {
@@ -97,8 +16,7 @@ export async function fetchQuote(providerSymbol) {
     throw new Error("During fetchQuote - providerSymbol missing or empty");
   }
   if (providerSymbol === "GOLD") {
-    // Scrap MoneyControl for MCX Gold Price
-    return fetchGoldPrice_MC();
+    return fetchGoldPrice_MoneyControl();
   } else {
     const provider = process.env.MARKET_FINANCIAL_DATA_PROVIDER;
     Logger.info(`Using ${provider} to fetch quotes.`);
@@ -180,4 +98,91 @@ export async function fetchQuote(providerSymbol) {
       };
     }
   }
+}
+
+export async function fetchGoldPrice_MoneyControl(date) {
+  try {
+    // Check if date is present and formatted as YYYY-MM-DD
+    if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      Logger.error(`Invalid date format in ${date}, expected YYYY-MM-DD`);
+      throw new Error("Invalid date format, expected YYYY-MM-DD");
+    }
+    // date was not present, take current date formatted as YYYY-MM-DD
+    date = new Date(Date.now()).toISOString().slice(0, 10);
+    Logger.info(`Checking Gold Price for date: ${date}`);
+
+    let result = await fetch(
+      "https://priceapi.moneycontrol.com/pricefeed/mcx/commodityfutures/GOLD?expiry=2025-12-05",
+      {
+        headers: {
+          accept: "application/json, text/plain, */*",
+          "accept-language": "en-IN,en-GB;q=0.9,en-US;q=0.8,en;q=0.7",
+          "if-none-match": "924D097B0E1954C448B3494B77396E95",
+          priority: "u=1, i",
+          "sec-ch-ua":
+            '"Google Chrome";v="141", "Not?A_Brand";v="8", "Chromium";v="141"',
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": '"macOS"',
+          "sec-fetch-dest": "empty",
+          "sec-fetch-mode": "cors",
+          "sec-fetch-site": "same-site",
+          Referer: "https://www.moneycontrol.com/",
+        },
+        body: null,
+        method: "GET",
+      }
+    );
+    if (!result.ok) {
+      Logger.error(
+        `MoneyControl API fetch failed with status ${result.status}`
+      );
+      throw new Error("Failed to fetch gold price from MoneyControl");
+    }
+    const data = await result.json();
+    Logger.info(`MoneyControl Gold API response: ${JSON.stringify(data)}`);
+
+    const price = data.data.avgPrice;
+    const unit = data.data.priceUnit;
+    const changePercent = parseFloat(data.data.perChange) || 0;
+    Logger.info(`Fetched Gold Price from MoneyControl: ${price} per ${unit}`);
+    return {
+      price,
+      unit,
+      changePercent,
+      raw: data,
+    };
+  } catch (error) {
+    Logger.error(`Error in fetchGoldPrice_MoneyControl: ${error.message}`);
+    throw error;
+  }
+}
+
+export async function MCX_Market_Watch(params) {
+  let market_values = await fetch(
+    "https://www.mcxindia.com/backpage.aspx/GetMarketWatch",
+    {
+      headers: {
+        accept: "application/json, text/javascript, */*; q=0.01",
+        "accept-language": "en-IN,en-GB;q=0.9,en-US;q=0.8,en;q=0.7",
+        "content-type": "application/json",
+        "sec-ch-ua":
+          '"Google Chrome";v="141", "Not?A_Brand";v="8", "Chromium";v="141"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": '"macOS"',
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-origin",
+        "x-requested-with": "XMLHttpRequest",
+        cookie:
+          "ASP.NET_SessionId=eeom5exrttj4tgml4pypevwh; _gid=GA1.2.910112827.1760453798; _ga=GA1.1.1061824458.1760453798; _ga_8BQ43G0902=GS2.1.s1760455747$o2$g0$t1760455747$j60$l0$h0",
+        Referer: "https://www.mcxindia.com/market-data/market-watch",
+      },
+      body: null,
+      method: "POST",
+    }
+  );
+  market_values = await market_values.json();
+  Logger.info(
+    `MCX Market Watch API response: ${JSON.stringify(market_values)}`
+  );
 }

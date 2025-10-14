@@ -10,7 +10,10 @@ import fs from 'fs';
 import path from 'path';
 import YAML from 'yaml';
 import { fileURLToPath } from 'url';
-import Logger from './config/logger.js';
+import { createLogger } from "./config/logger.js";
+import { requestIdMiddleware } from './middleware/requestId.middleware.js';
+import { getRequestId } from './config/logger.js';
+const Logger = createLogger(import.meta.url);
 
 export function createApp() {
   const app = express();
@@ -19,10 +22,16 @@ export function createApp() {
     write: (message) => Logger.http(message.trim()),
   };
 
+  // Register custom token for requestId used by correlation middleware
+  morgan.token('rid', () => getRequestId() || '-');
+
   const morganMiddleware = morgan(
-    ':method :url :status :res[content-length] - :response-time ms',
+    ':method :url :status :res[content-length] - :response-time ms rid=:rid',
     { stream },
   );
+
+  // Correlation ID middleware FIRST so downstream logs can include it
+  app.use(requestIdMiddleware);
 
   app.use(morganMiddleware);
   app.use(helmet());
