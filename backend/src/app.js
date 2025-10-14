@@ -10,14 +10,25 @@ import fs from 'fs';
 import path from 'path';
 import YAML from 'yaml';
 import { fileURLToPath } from 'url';
+import Logger from './config/logger.js';
 
 export function createApp() {
   const app = express();
+
+  const stream = {
+    write: (message) => Logger.http(message.trim()),
+  };
+
+  const morganMiddleware = morgan(
+    ':method :url :status :res[content-length] - :response-time ms',
+    { stream },
+  );
+
+  app.use(morganMiddleware);
   app.use(helmet());
   // Support raw text (CSV) uploads for batch import BEFORE json parser
   app.use(express.text({ type: 'text/plain', limit: '256kb' }));
   app.use(express.json({ limit: '1mb' }));
-  app.use(morgan(process.env.NODE_ENV === 'test' ? 'tiny' : 'dev'));
   const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
   app.use(cors({
     origin: (origin, cb) => {
@@ -43,12 +54,12 @@ export function createApp() {
       const doc = YAML.parse(raw);
       app.use('/docs', swaggerUi.serve, swaggerUi.setup(doc, { explorer: true }));
       app.get('/docs.json', (req, res) => res.json(doc));
-      console.log('Swagger UI mounted at /docs (spec:', specPath, ')');
+      Logger.info(`Swagger UI mounted at /docs (spec: ${specPath})`);
     } else {
-      console.warn('Swagger spec not found in candidates:', candidates);
+      Logger.warn(`Swagger spec not found in candidates: ${candidates.join(', ')}`);
     }
   } catch (e) {
-    console.warn('Swagger setup failed:', e.message);
+    Logger.error('Swagger setup failed:', e);
   }
   app.use('/api', router);
   app.use(errorHandler);
