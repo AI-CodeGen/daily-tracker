@@ -10,193 +10,84 @@ import * as cheerio from "cheerio";
 // initialized when this file is imported. Always read from process.env inside
 // the function so a later dotenv.config() call is honored.
 
-export async function fetchGoldPrice_MoneyControl() {
-  let browser;
-  let page;
-  try {
-    // Launch a headless browser
-    browser = await puppeteer.launch({
-      headless: "new",
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    });
-    page = await browser.newPage();
-
-    // Block images to speed up loading
-    await page.setRequestInterception(true);
-    page.on("request", (req) => {
-      if (req.resourceType() === "image") {
-        req.abort();
-      } else {
-        req.continue();
-      }
-    });
-
-    // Set a realistic user agent
-    await page.setUserAgent(
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-    );
-
-    // Navigate to the Moneycontrol page
-    const url = "https://www.moneycontrol.com/commodity/gold-price.html";
-    await page.goto(url, { waitUntil: "networkidle2" });
-
-    // --- Handle potential cookie consent pop-up ---
-    try {
-      const cookieButtonSelector = "#wzrk-cancel";
-      await page.waitForSelector(cookieButtonSelector, {
-        timeout: 5000,
-        visible: true,
-      });
-      await page.click(cookieButtonSelector);
-      Logger.info("Dismissed a notification pop-up.");
-    } catch (e) {
-      Logger.info("No notification pop-up found or it was not clickable.");
-    }
-
-    // --- Use a more robust selector strategy: Find by Text ---
-    // Use XPath to find a div that contains the text "MCX"
-    const mcxHeaderXPath = '//div[contains(text(), "MCX")]';
-    await page.waitForXPath(mcxHeaderXPath, { timeout: 15000 });
-    const mcxHeaderElements = await page.$x(mcxHeaderXPath);
-
-    if (mcxHeaderElements.length === 0) {
-      throw new Error('Could not find the "MCX" header on the page.');
-    }
-
-    // Now, get the parent container of that header and find the price within it.
-    const data = await mcxHeaderElements[0].evaluate((header) => {
-      // Assumption: The header is inside the container that holds the price.
-      // Let's traverse up to a common parent, assuming a structure like:
-      // <div class="container">
-      //   <div>MCX</div>
-      //   ...
-      //   <div class="price">...</div>
-      // </div>
-      const container = header.closest(".data_container"); // Adjust if class is different
-      if (!container) return null;
-
-      const priceElement = container.querySelector(".price.stprh");
-      const priceText = priceElement ? priceElement.innerText : "0";
-
-      const changeElement = container.querySelector(".pricupdn");
-      const changeText = changeElement ? changeElement.innerText : "0";
-
-      return { priceText, changeText };
-    });
-
-    if (!data) {
-      throw new Error(
-        "Found MCX header, but could not find price container structure."
-      );
-    }
-
-    // Parse the extracted text
-    const price = parseFloat(data.priceText.replace(/,/g, ""));
-    const change = parseFloat(data.changeText);
-
-    if (isNaN(price) || isNaN(change)) {
-      Logger.error(
-        "Could not parse MCX gold price or change from Moneycontrol"
-      );
-      throw new Error(
-        "Could not parse MCX gold price or change from Moneycontrol"
-      );
-    }
-
-    // Calculate percentage change
-    const previousPrice = price - change;
-    const changePercent =
-      previousPrice !== 0 ? (change / previousPrice) * 100 : 0;
-
-    Logger.info(
-      `Scraped MCX Gold Price: ${price}, Change: ${change}, Change %: ${changePercent.toFixed(
-        2
-      )}`
-    );
-
-    return {
-      price: price,
-      changePercent: changePercent,
-      raw: { price, change },
-    };
-  } catch (error) {
-    Logger.error("Error scraping MCX gold price from Moneycontrol:", error);
-    // In case of failure, log the page content for debugging
-    if (page) {
-      const pageContent = await page.content();
-      Logger.debug("Page HTML on failure:", pageContent.substring(0, 2000));
-    }
-    throw new Error("Failed to fetch MCX gold price from Moneycontrol");
-  } finally {
-    // Ensure the browser is closed
-    if (browser) {
-      await browser.close();
-    }
+export async function fetchGoldPrice_MoneyControl(date) {
+  // Check if date is present and formatted as YYYY-MM-DD
+  if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    Logger.error(`Invalid date format in ${date}, expected YYYY-MM-DD`);
+    throw new Error("Invalid date format, expected YYYY-MM-DD");
   }
+  // date was not present, take current date formatted as YYYY-MM-DD
+  date = Date.now().toISOString().slice(0, 10);
+  Logger.info(`Checking Gold Price for date: ${date}`);
+  
+  let result = await fetch(
+    "https://priceapi.moneycontrol.com/pricefeed/mcx/commodityfutures/GOLD?expiry=2025-12-05",
+    {
+      headers: {
+        accept: "application/json, text/plain, */*",
+        "accept-language": "en-IN,en-GB;q=0.9,en-US;q=0.8,en;q=0.7",
+        "if-none-match": "924D097B0E1954C448B3494B77396E95",
+        priority: "u=1, i",
+        "sec-ch-ua":
+          '"Google Chrome";v="141", "Not?A_Brand";v="8", "Chromium";v="141"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": '"macOS"',
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-site",
+        Referer: "https://www.moneycontrol.com/",
+      },
+      body: null,
+      method: "GET",
+    }
+  );
+  if (!result.ok) {
+    Logger.error(`MoneyControl API fetch failed with status ${result.status}`);
+    throw new Error("Failed to fetch gold price from MoneyControl");
+  }
+  const data = await result.json();
+  Logger.info(`MoneyControl Gold API response: ${JSON.stringify(data)}`);
+
+  const price = data.data.avgPrice;
+  const unit = data.data.priceUnit;
+  const changePercent = parseFloat(data.data.perChange) || 0;
+  Logger.info(`Fetched Gold Price from MoneyControl: ${price} per ${unit}`);
+  return {
+    price,
+    unit,
+    changePercent,
+    raw: data,
+  };
 }
 
-export async function fetchGoldPrice_GoodReturns() {
-  let browser;
-  try {
-    browser = await puppeteer.launch({
-      headless: "new",
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    });
-    const page = await browser.newPage();
-    await page.setUserAgent(
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    );
-
-    const url = "https://www.goodreturns.in/gold-rates/bangalore.html";
-    await page.goto(url, { waitUntil: "networkidle2" });
-
-    // Find the table for 24 Carat Gold Rate and extract the price for 1 gram.
-    const priceData = await page.evaluate(() => {
-      const tables = Array.from(document.querySelectorAll("table"));
-      let price = null;
-      for (const table of tables) {
-        const header = table.querySelector("thead th");
-        if (header && header.innerText.includes("24 CARAT GOLD RATE")) {
-          const firstRow = table.querySelector("tbody tr");
-          if (firstRow) {
-            const priceCell = firstRow.cells[1]; // Second cell for the price
-            if (priceCell) {
-              price = priceCell.innerText;
-              break; // Exit loop once found
-            }
-          }
-        }
-      }
-      return price;
-    });
-
-    if (!priceData) {
-      throw new Error("Could not find the 24K gold price table on the page.");
+export async function MCX_Market_Watch(params) {
+  let market_values = await fetch(
+    "https://www.mcxindia.com/backpage.aspx/GetMarketWatch",
+    {
+      headers: {
+        accept: "application/json, text/javascript, */*; q=0.01",
+        "accept-language": "en-IN,en-GB;q=0.9,en-US;q=0.8,en;q=0.7",
+        "content-type": "application/json",
+        "sec-ch-ua":
+          '"Google Chrome";v="141", "Not?A_Brand";v="8", "Chromium";v="141"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": '"macOS"',
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-origin",
+        "x-requested-with": "XMLHttpRequest",
+        cookie:
+          "ASP.NET_SessionId=eeom5exrttj4tgml4pypevwh; _gid=GA1.2.910112827.1760453798; _ga=GA1.1.1061824458.1760453798; _ga_8BQ43G0902=GS2.1.s1760455747$o2$g0$t1760455747$j60$l0$h0",
+        Referer: "https://www.mcxindia.com/market-data/market-watch",
+      },
+      body: null,
+      method: "POST",
     }
-
-    // Price is in the format "₹ 6,325". We need to parse it.
-    const price = parseFloat(priceData.replace(/[^0-9.]/g, ""));
-
-    if (isNaN(price)) {
-      throw new Error("Could not parse the gold price from the page.");
-    }
-
-    Logger.info(`Scraped Gold Price from GoodReturns: ${price}`);
-
-    // GoodReturns does not easily provide change percentage on this page.
-    return {
-      price: price,
-      changePercent: 0, // Returning 0 as change is not available
-      raw: { price },
-    };
-  } catch (err) {
-    Logger.error("Error fetching gold price from GoodReturns:", err.message);
-    throw new Error("Failed to fetch gold rate from GoodReturns");
-  } finally {
-    if (browser) {
-      await browser.close();
-    }
-  }
+  );
+  market_values = await market_values.json();
+  Logger.info(
+    `MCX Market Watch API response: ${JSON.stringify(market_values)}`
+  );
 }
 
 // Basic fetch using rapid API style (placeholder) -- adjust with real endpoint or yfinance proxy
@@ -207,7 +98,7 @@ export async function fetchQuote(providerSymbol) {
   }
   if (providerSymbol === "GOLD") {
     // Scrap MoneyControl for MCX Gold Price
-    return fetchGoldPrice_GoodReturns();
+    return fetchGoldPrice_MC();
   } else {
     const provider = process.env.MARKET_FINANCIAL_DATA_PROVIDER;
     Logger.info(`Using ${provider} to fetch quotes.`);
