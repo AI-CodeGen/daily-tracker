@@ -11,6 +11,7 @@ const snapshotSchema = new mongoose.Schema(
     price: { type: Number, required: true },
     changePercent: { type: Number },
     unit: { type: String },
+    currency: { type: String },
 
     raw: { type: Object },
     takenAt: { type: Date, default: Date.now, index: true },

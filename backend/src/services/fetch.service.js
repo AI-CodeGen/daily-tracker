@@ -49,6 +49,7 @@ export async function fetchQuote(providerSymbol) {
       return {
         price: result.regularMarketPrice,
         changePercent: result.regularMarketChangePercent,
+        currency: result.currency,
         raw: result,
       };
     } else if (provider === "ALPHA_VANTAGE") {

@@ -15,6 +15,8 @@ export async function currentQuotes(req, res, next) {
           symbol: asset.symbol,
           name: asset.name,
           price: snap.price,
+          unit: snap.unit || asset.unit || null,
+          currency: snap.currency || asset.currency || 'INR',
           changePercent: snap.changePercent,
           takenAt: snap.takenAt,
         });
