@@ -15,9 +15,17 @@ export async function fetchQuote(providerSymbol) {
     Logger.error("During fetchQuote - providerSymbol missing or empty");
     throw new Error("During fetchQuote - providerSymbol missing or empty");
   }
-  if (providerSymbol === "GOLD") {
-    return fetchGoldPrice_MoneyControl();
-  } else {
+  switch (providerSymbol) {
+    case "GOLD":
+      return fetchGoldPrice_MoneyControl();
+    case "SILVER":
+      return fetchSilverPrice_MoneyControl();
+    default:
+      return fetchMarketQuotes();
+  }
+}
+
+export async function fetchMarketQuotes() {
     const provider = process.env.MARKET_FINANCIAL_DATA_PROVIDER;
     Logger.info(`Using ${provider} to fetch quotes.`);
     if (provider === "YAHOO_FINANCE") {
@@ -99,7 +107,6 @@ export async function fetchQuote(providerSymbol) {
       };
     }
   }
-}
 
 export async function fetchGoldPrice_MoneyControl(date) {
   try {
@@ -135,7 +142,7 @@ export async function fetchGoldPrice_MoneyControl(date) {
     );
     if (!result.ok) {
       Logger.error(
-        `MoneyControl API fetch failed with status ${result.status}`
+        `MoneyControl Gold API fetch failed with status ${result.status}`
       );
       throw new Error("Failed to fetch gold price from MoneyControl");
     }
@@ -154,6 +161,63 @@ export async function fetchGoldPrice_MoneyControl(date) {
     };
   } catch (error) {
     Logger.error(`Error in fetchGoldPrice_MoneyControl: ${error.message}`);
+    throw error;
+  }
+}
+
+export async function fetchSilverPrice_MoneyControl(date) {
+  try {
+    // Check if date is present and formatted as YYYY-MM-DD
+    if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      Logger.error(`Invalid date format in ${date}, expected YYYY-MM-DD`);
+      throw new Error("Invalid date format, expected YYYY-MM-DD");
+    }
+    // date was not present, take current date formatted as YYYY-MM-DD
+    date = new Date(Date.now()).toISOString().slice(0, 10);
+    Logger.info(`Checking Silver Price for date: ${date}`);
+
+    let result = await fetch(
+      `https://priceapi.moneycontrol.com/pricefeed/mcx/commodityfutures/SILVER?expiry=2025-12-05`,
+      {
+        headers: {
+          accept: "application/json, text/plain, */*",
+          "accept-language": "en-IN,en-GB;q=0.9,en-US;q=0.8,en;q=0.7",
+          "if-none-match": "924D097B0E1954C448B3494B77396E95",
+          priority: "u=1, i",
+          "sec-ch-ua":
+            '"Google Chrome";v="141", "Not?A_Brand";v="8", "Chromium";v="141"',
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": '"macOS"',
+          "sec-fetch-dest": "empty",
+          "sec-fetch-mode": "cors",
+          "sec-fetch-site": "same-site",
+          Referer: "https://www.moneycontrol.com/",
+        },
+        body: null,
+        method: "GET",
+      }
+    );
+    if (!result.ok) {
+      Logger.error(
+        `MoneyControl Silver API fetch failed with status ${result.status}`
+      );
+      throw new Error("Failed to fetch silver price from MoneyControl");
+    }
+    const data = await result.json();
+    Logger.info(`MoneyControl Silver API response: ${JSON.stringify(data)}`);
+
+    const price = data.data.avgPrice;
+    const unit = data.data.priceUnit;
+    const changePercent = parseFloat(data.data.perChange) || 0;
+    Logger.info(`Fetched Silver Price from MoneyControl: ${price} per ${unit}`);
+    return {
+      price,
+      unit,
+      changePercent,
+      raw: data,
+    };
+  } catch (error) {
+    Logger.error(`Error in fetchSilverPrice_MoneyControl: ${error.message}`);
     throw error;
   }
 }
