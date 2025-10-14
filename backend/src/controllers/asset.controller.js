@@ -1,5 +1,6 @@
 import Joi from 'joi';
 import { createLogger } from "../config/logger.js";
+import Asset from '../models/Asset.js';
 const Logger = createLogger(import.meta.url);
 
 const assetSchema = Joi.object({
@@ -7,6 +8,7 @@ const assetSchema = Joi.object({
   symbol: Joi.string().alphanum().min(2).max(12).required(),
   providerSymbol: Joi.string().required(),
   unit: Joi.string().optional().allow(''),
+  currency: Joi.string().trim().length(3).uppercase().optional(),
   upperThreshold: Joi.number().optional().allow(null),
   lowerThreshold: Joi.number().optional().allow(null),
 });
@@ -105,6 +107,8 @@ export async function batchImport(req, res, next) {
         name: row.name,
         symbol: row.symbol,
         providerSymbol: row.providerSymbol,
+        unit: row.unit || undefined,
+        currency: row.currency ? row.currency.toUpperCase() : undefined,
       };
       if (row.upperThreshold) doc.upperThreshold = Number(row.upperThreshold);
       if (row.lowerThreshold) doc.lowerThreshold = Number(row.lowerThreshold);
