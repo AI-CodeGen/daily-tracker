@@ -146,9 +146,12 @@ export const ConfigPage: React.FC = () => {
                 currentPage++;
               } while (currentPage <= pages);
 
-              const headers = ['name', 'symbol', 'providerSymbol', 'upperThreshold', 'lowerThreshold', 'unit', 'currency'];
+              const headers = ['name', 'symbol', 'providerSymbol', 'upperThreshold', 'lowerThreshold', 'unit', 'currency', 'isGlobal'];
               const lines = [headers.join(',')];
+              let exportableCount = 0;
               for (const a of all) {
+                if (a.isGlobal) continue; // skip global assets
+                // Only export user-added assets
                 const row = [
                   a.name ?? '',
                   a.symbol ?? '',
@@ -156,23 +159,30 @@ export const ConfigPage: React.FC = () => {
                   a.upperThreshold != null ? String(a.upperThreshold) : '',
                   a.lowerThreshold != null ? String(a.lowerThreshold) : '',
                   a.unit ?? '',
-                  a.currency ?? ''
+                  a.currency ?? '',
+                  a.isGlobal ? 'true' : 'false'
                 ];
+                exportableCount++;
                 // basic CSV escape (wrap if contains comma or quote)
                 const safe = row.map(v => /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v);
                 lines.push(safe.join(','));
               }
-              const blob = new Blob([lines.join('\n') + '\n'], { type: 'text/csv;charset=utf-8;' });
-              const url = URL.createObjectURL(blob);
-              const aEl = document.createElement('a');
-              aEl.href = url;
-              const ts = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19);
-              aEl.download = `assets-export-${ts}.csv`;
-              document.body.appendChild(aEl);
-              aEl.click();
-              document.body.removeChild(aEl);
-              URL.revokeObjectURL(url);
-              toast.push(`Exported ${all.length} assets`, 'success');
+              if (exportableCount > 0) {
+                const blob = new Blob([lines.join('\n') + '\n'], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const aEl = document.createElement('a');
+                aEl.href = url;
+                const ts = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19);
+                aEl.download = `assets-export-${ts}.csv`;
+                document.body.appendChild(aEl);
+                aEl.click();
+                document.body.removeChild(aEl);
+                URL.revokeObjectURL(url);
+                toast.push(`Exported ${exportableCount} user-added assets`, 'success');
+                toast.push('Default assets don\'t have to be exported', 'info');
+              } else {
+                toast.push('No user-added assets to export', 'info');
+              }
             } catch (err: any) {
               toast.push('Export failed', 'error');
             }
@@ -305,11 +315,11 @@ export const ConfigPage: React.FC = () => {
                     <div className="font-semibold tracking-wide">{a.name} <span className="text-xs opacity-60">({a.symbol})</span></div>
                     {a.isGlobal ? (
                       <span className="text-[10px] px-2 py-0.5 bg-emerald-600/20 text-emerald-400 rounded-full border border-emerald-600/30">
-                        GLOBAL
+                        DEFAULT
                       </span>
                     ) : (
-                      <span className="text-[10px] px-2 py-0.5 bg-indigo-600/20 text-indigo-400 rounded-full border border-indigo-600/30">
-                        USER
+                      <span className="text-[10px] px-2 py-0.5 bg-blue-600/20 text-blue-400 rounded-full border border-indigo-600/30">
+                        USER ADDED
                       </span>
                     )}
                   </div>
