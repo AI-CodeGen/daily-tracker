@@ -186,7 +186,7 @@ export const ConfigPage: React.FC = () => {
             } catch (err: any) {
               toast.push('Export failed', 'error');
             }
-          }} className="bg-gray-700 px-3 py-2 rounded">Export Configurations</button>
+          }} className="bg-indigo-600 px-3 py-2 rounded">Export Configurations</button>
         )}
       </div>
       {isAuthenticated && <div className="text-[10px] opacity-60 -mt-2">Export format matches import headers: name,symbol,providerSymbol,upperThreshold,lowerThreshold,unit,currency</div>}
