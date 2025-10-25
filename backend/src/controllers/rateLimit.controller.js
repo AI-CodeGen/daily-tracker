@@ -1,6 +1,10 @@
 import RateLimit from '../models/RateLimit.js';
-import { asyncHandler } from '../middleware/errorHandlers.js';
 import Logger from '../config/logger.js';
+
+// A simple wrapper to catch errors from async Express route handlers
+const asyncHandler = (fn) => (req, res, next) =>
+  Promise.resolve(fn(req, res, next)).catch(next);
+
 
 // @desc    Get rate limit settings for a specific endpoint
 // @route   GET /api/admin/rate-limits/:endpoint
