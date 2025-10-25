@@ -13,8 +13,8 @@ export const ConfigPage: React.FC = () => {
   const [pageSize, setPageSize] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
-  const [sortBy, setSortBy] = useState<'name'|'symbol'|'createdAt'>('createdAt');
-  const [sortDir, setSortDir] = useState<'asc'|'desc'>('asc');
+  const [sortBy, setSortBy] = useState<'name' | 'symbol' | 'createdAt'>('createdAt');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [query, setQuery] = useState('');
   const toast = useToast();
   const [csvText, setCsvText] = useState('');
@@ -41,7 +41,7 @@ export const ConfigPage: React.FC = () => {
         setTotal(res.total);
       }
       if (resetPage) setPage(1);
-    } catch (e:any) {
+    } catch (e: any) {
       toast.push('Failed to load assets', 'error');
     } finally { setLoading(false); }
   }
@@ -52,7 +52,7 @@ export const ConfigPage: React.FC = () => {
   useEffect(() => {
     const id = setTimeout(() => { load(true); }, 400);
     return () => clearTimeout(id);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
 
   // Inline duplicate symbol check (on symbol field change) handled in AssetForm? We'll add here by intercepting create.
@@ -114,70 +114,72 @@ export const ConfigPage: React.FC = () => {
             </div>
             <button onClick={async () => {
               if (!csvText.trim()) return;
-                try {
-                  const { imported } = await batchImport(csvText.trim());
-                  toast.push(`Imported ${imported} assets`, 'success');
-                  setCsvText('');
-                  load(true);
-                } catch (e:any) {
-                  toast.push('Import failed', 'error');
-                }
+              try {
+                const { imported } = await batchImport(csvText.trim());
+                toast.push(`Imported ${imported} assets`, 'success');
+                setCsvText('');
+                load(true);
+              } catch (e: any) {
+                toast.push('Import failed', 'error');
+              }
             }} className="bg-indigo-600 px-3 py-2 rounded">Upload</button>
           </>
         )}
-        <button onClick={async () => {
-          try {
-            // Fetch all assets ignoring pagination (iterate pages)
-            let all: Asset[] = [];
-            let currentPage = 1;
-            let pages = 1;
-            do {
-              // request large page size to minimize loops
-              const res = await getAssets({ page: currentPage, pageSize: 200, sortBy, sortDir, q: query || undefined });
-              if (Array.isArray(res)) {
-                all = res; // non-paginated mode
-                pages = 1;
-                break;
-              } else {
-                all = all.concat(res.data);
-                pages = res.totalPages;
-              }
-              currentPage++;
-            } while (currentPage <= pages);
+        {isAuthenticated && (
+          <button onClick={async () => {
+            try {
+              // Fetch all assets ignoring pagination (iterate pages)
+              let all: Asset[] = [];
+              let currentPage = 1;
+              let pages = 1;
+              do {
+                // request large page size to minimize loops
+                const res = await getAssets({ page: currentPage, pageSize: 200, sortBy, sortDir, q: query || undefined });
+                if (Array.isArray(res)) {
+                  all = res; // non-paginated mode
+                  pages = 1;
+                  break;
+                } else {
+                  all = all.concat(res.data);
+                  pages = res.totalPages;
+                }
+                currentPage++;
+              } while (currentPage <= pages);
 
-            const headers = ['name','symbol','providerSymbol','upperThreshold','lowerThreshold','unit','currency'];
-            const lines = [headers.join(',')];
-            for (const a of all) {
-              const row = [
-                a.name ?? '',
-                a.symbol ?? '',
-                a.providerSymbol ?? '',
-                a.upperThreshold != null ? String(a.upperThreshold) : '',
-                a.lowerThreshold != null ? String(a.lowerThreshold) : '',
-                a.unit ?? '',
-                a.currency ?? ''
-              ];
-              // basic CSV escape (wrap if contains comma or quote)
-              const safe = row.map(v => /[",\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v);
-              lines.push(safe.join(','));
+              const headers = ['name', 'symbol', 'providerSymbol', 'upperThreshold', 'lowerThreshold', 'unit', 'currency'];
+              const lines = [headers.join(',')];
+              for (const a of all) {
+                const row = [
+                  a.name ?? '',
+                  a.symbol ?? '',
+                  a.providerSymbol ?? '',
+                  a.upperThreshold != null ? String(a.upperThreshold) : '',
+                  a.lowerThreshold != null ? String(a.lowerThreshold) : '',
+                  a.unit ?? '',
+                  a.currency ?? ''
+                ];
+                // basic CSV escape (wrap if contains comma or quote)
+                const safe = row.map(v => /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v);
+                lines.push(safe.join(','));
+              }
+              const blob = new Blob([lines.join('\n') + '\n'], { type: 'text/csv;charset=utf-8;' });
+              const url = URL.createObjectURL(blob);
+              const aEl = document.createElement('a');
+              aEl.href = url;
+              const ts = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19);
+              aEl.download = `assets-export-${ts}.csv`;
+              document.body.appendChild(aEl);
+              aEl.click();
+              document.body.removeChild(aEl);
+              URL.revokeObjectURL(url);
+              toast.push(`Exported ${all.length} assets`, 'success');
+            } catch (err: any) {
+              toast.push('Export failed', 'error');
             }
-            const blob = new Blob([lines.join('\n') + '\n'], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const aEl = document.createElement('a');
-            aEl.href = url;
-            const ts = new Date().toISOString().replace(/[:T]/g,'-').slice(0,19);
-            aEl.download = `assets-export-${ts}.csv`;
-            document.body.appendChild(aEl);
-            aEl.click();
-            document.body.removeChild(aEl);
-            URL.revokeObjectURL(url);
-            toast.push(`Exported ${all.length} assets`, 'success');
-          } catch (err:any) {
-            toast.push('Export failed', 'error');
-          }
-        }} className="bg-gray-700 px-3 py-2 rounded">Export</button>
+          }} className="bg-gray-700 px-3 py-2 rounded">Export Configurations</button>
+        )}
       </div>
-      <div className="text-[10px] opacity-60 -mt-2">Export format matches import headers: name,symbol,providerSymbol,upperThreshold,lowerThreshold,unit,currency</div>
+      {isAuthenticated && <div className="text-[10px] opacity-60 -mt-2">Export format matches import headers: name,symbol,providerSymbol,upperThreshold,lowerThreshold,unit,currency</div>}
       {loading && <div className="text-sm opacity-60">Loading...</div>}
       <div className="space-y-2">
         {assets.map(a => (
@@ -204,7 +206,7 @@ export const ConfigPage: React.FC = () => {
                             setEditSymbolDup(true);
                             toast.push(`Duplicate symbol: ${editForm.symbol}`, 'error');
                           }
-                        } catch {/* ignore */}
+                        } catch {/* ignore */ }
                       }}
                     />
                     {editSymbolDup && <span className="text-[10px] text-rose-400 mt-0.5">Symbol already exists</span>}
@@ -268,7 +270,7 @@ export const ConfigPage: React.FC = () => {
                         setAssets(prev => prev.map(p => p._id === a._id ? updated : p));
                         toast.push(`Updated ${updated.symbol}`, 'success');
                         setEditingId(null);
-                      } catch (err:any) {
+                      } catch (err: any) {
                         toast.push('Update failed', 'error');
                       } finally { setEditLoading(false); }
                     }}
@@ -336,12 +338,12 @@ export const ConfigPage: React.FC = () => {
                         }}
                         className="text-indigo-400 hover:underline"
                       >Edit</button>
-                      <button 
-                        onClick={async () => { 
-                          await deleteAsset(a._id); 
-                          setAssets(prev => prev.filter(p => p._id !== a._id)); 
-                          toast.push(`Deleted ${a.symbol}`, 'info'); 
-                        }} 
+                      <button
+                        onClick={async () => {
+                          await deleteAsset(a._id);
+                          setAssets(prev => prev.filter(p => p._id !== a._id));
+                          toast.push(`Deleted ${a.symbol}`, 'info');
+                        }}
                         className="text-rose-400 hover:underline"
                       >Delete</button>
                     </>
@@ -368,7 +370,7 @@ export const ConfigPage: React.FC = () => {
         <button disabled={page >= totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))} className="px-2 py-1 bg-gray-800 rounded disabled:opacity-40">Next</button>
         <label className="flex items-center gap-1">Page Size
           <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }} className="bg-gray-800 px-2 py-1 rounded">
-            {[5,10,20,50].map(s => <option key={s} value={s}>{s}</option>)}
+            {[5, 10, 20, 50].map(s => <option key={s} value={s}>{s}</option>)}
           </select>
         </label>
       </div>
