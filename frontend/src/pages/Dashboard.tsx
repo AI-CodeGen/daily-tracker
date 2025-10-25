@@ -50,7 +50,14 @@ export const Dashboard: React.FC = () => {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <h2 className="text-xl font-semibold">Live Dashboard</h2>
+        <div className="flex items-baseline gap-3">
+          <h2 className="text-xl font-semibold">Live Dashboard</h2>
+          {import.meta.env.VITE_MARKET_FINANCIAL_DATA_PROVIDER && (
+            <span className="text-xs text-gray-500">
+              Market data powered by {import.meta.env.VITE_MARKET_FINANCIAL_DATA_PROVIDER}
+            </span>
+          )}
+        </div>
         <button
           disabled={refreshing}
           onClick={async () => {
