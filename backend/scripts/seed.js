@@ -10,8 +10,7 @@ async function run() {
   const defaults = [
     { name: 'Nifty 50', symbol: 'NIFTY', providerSymbol: '^NSEI', isGlobal: true },
     { name: 'Sensex', symbol: 'SENSEX', providerSymbol: '^BSESN', isGlobal: true },
-    { name: 'Gold', symbol: 'GOLD', providerSymbol: 'GC=F', isGlobal: true },
-    { name: 'Silver', symbol: 'SILVER', providerSymbol: 'SI=F', isGlobal: true },
+    { name: 'Gold', symbol: 'GOLD', providerSymbol: 'GOLD', isGlobal: true },
   ];
   for (const def of defaults) {
     // eslint-disable-next-line no-await-in-loop
