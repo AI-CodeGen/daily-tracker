@@ -3,7 +3,9 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import morgan from 'morgan';
+import session from 'express-session';
 import router from './routes/index.js';
+import authRoutes from './routes/auth.js';
 import { errorHandler } from './middleware/error.js';
 import swaggerUi from 'swagger-ui-express';
 import fs from 'fs';
@@ -13,6 +15,7 @@ import { fileURLToPath } from 'url';
 import { createLogger } from "./config/logger.js";
 import { requestIdMiddleware } from './middleware/requestId.middleware.js';
 import { getRequestId } from './config/logger.js';
+import passport from './config/passport.js';
 const Logger = createLogger(import.meta.url);
 
 export function createApp() {
@@ -35,6 +38,23 @@ export function createApp() {
 
   app.use(morganMiddleware);
   app.use(helmet());
+  
+  // Session configuration
+  app.use(session({
+    secret: process.env.SESSION_SECRET || 'default-secret-change-in-production',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === 'production',
+      httpOnly: true,
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    }
+  }));
+
+  // Passport middleware
+  app.use(passport.initialize());
+  app.use(passport.session());
+
   // Support raw text (CSV) uploads for batch import BEFORE json parser
   app.use(express.text({ type: 'text/plain', limit: '256kb' }));
   app.use(express.json({ limit: '1mb' }));
@@ -44,6 +64,7 @@ export function createApp() {
       if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) return cb(null, true);
       return cb(new Error('Not allowed by CORS'));
     },
+    credentials: true
   }));
   app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 500 }));
   // Swagger UI (read once, cache in memory) with resilient path resolution
@@ -70,6 +91,11 @@ export function createApp() {
   } catch (e) {
     Logger.error('Swagger setup failed:', e);
   }
+  
+  // Mount auth routes directly (not under /api) for OAuth callbacks
+  app.use('/auth', authRoutes);
+  
+  // Mount other API routes under /api
   app.use('/api', router);
   app.use(errorHandler);
   return app;

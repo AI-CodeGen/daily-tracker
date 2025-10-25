@@ -1,7 +1,13 @@
 import axios from 'axios';
 import type { Asset, QuoteSnapshot } from '../types';
 
-const client = axios.create({ baseURL: '/api' });
+const client = axios.create({ 
+  baseURL: '/api',
+  withCredentials: true
+});
+
+// Export the client for auth context to use
+export const apiClient = client;
 
 export interface AssetListParams {
   page?: number;

@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { createAsset, deleteAsset, getAssets, updateAsset, checkDuplicateSymbol, batchImport } from '../services/api';
 import { useToast } from '../components/ToastProvider';
+import { useAuth } from '../context/AuthContext';
 import type { Asset } from '../types';
 import { AssetForm } from '../components/AssetForm';
 
 export const ConfigPage: React.FC = () => {
+  const { isAuthenticated } = useAuth();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -57,22 +59,33 @@ export const ConfigPage: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-semibold">Configuration</h2>
-      <AssetForm onCreate={async a => {
-        const symbol = a.symbol || '';
-        const dup = await checkDuplicateSymbol(symbol);
-        if (dup.exists) {
-          setDupWarning(`Symbol ${symbol} already exists`);
-          toast.push(`Duplicate symbol: ${symbol}`, 'error');
-          throw new Error('Duplicate');
-        }
-        setDupWarning(null);
-        const created = await createAsset(a);
-        toast.push(`Added ${created.symbol}`, 'success');
-        load(true);
-        return created;
-      }} />
-      {dupWarning && <div className="text-xs text-rose-400">{dupWarning}</div>}
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold">Configuration</h2>
+        {!isAuthenticated && (
+          <div className="text-sm text-amber-400 bg-amber-400/10 px-3 py-2 rounded border border-amber-400/20">
+            Login with Google to create and manage your own assets
+          </div>
+        )}
+      </div>
+      {isAuthenticated && (
+        <>
+          <AssetForm onCreate={async a => {
+            const symbol = a.symbol || '';
+            const dup = await checkDuplicateSymbol(symbol);
+            if (dup.exists) {
+              setDupWarning(`Symbol ${symbol} already exists`);
+              toast.push(`Duplicate symbol: ${symbol}`, 'error');
+              throw new Error('Duplicate');
+            }
+            setDupWarning(null);
+            const created = await createAsset(a);
+            toast.push(`Added ${created.symbol}`, 'success');
+            load(true);
+            return created;
+          }} />
+          {dupWarning && <div className="text-xs text-rose-400">{dupWarning}</div>}
+        </>
+      )}
       <div className="flex flex-wrap gap-4 items-end text-xs">
         <div className="flex flex-col">
           <label className="uppercase tracking-wide">Sort By</label>
@@ -93,21 +106,25 @@ export const ConfigPage: React.FC = () => {
           <label className="uppercase tracking-wide">Search</label>
           <input value={query} onChange={e => setQuery(e.target.value)} placeholder="name/symbol" className="bg-gray-800 px-2 py-1 rounded w-40" />
         </div>
-        <div className="flex flex-col w-64">
-          <label className="uppercase tracking-wide">Batch CSV</label>
-          <textarea value={csvText} onChange={e => setCsvText(e.target.value)} rows={3} placeholder="name,symbol,providerSymbol,upperThreshold,lowerThreshold" className="bg-gray-800 px-2 py-1 rounded resize-y" />
-        </div>
-        <button onClick={async () => {
-          if (!csvText.trim()) return;
-            try {
-              const { imported } = await batchImport(csvText.trim());
-              toast.push(`Imported ${imported} assets`, 'success');
-              setCsvText('');
-              load(true);
-            } catch (e:any) {
-              toast.push('Import failed', 'error');
-            }
-        }} className="bg-indigo-600 px-3 py-2 rounded">Upload</button>
+        {isAuthenticated && (
+          <>
+            <div className="flex flex-col w-64">
+              <label className="uppercase tracking-wide">Batch CSV</label>
+              <textarea value={csvText} onChange={e => setCsvText(e.target.value)} rows={3} placeholder="name,symbol,providerSymbol,upperThreshold,lowerThreshold" className="bg-gray-800 px-2 py-1 rounded resize-y" />
+            </div>
+            <button onClick={async () => {
+              if (!csvText.trim()) return;
+                try {
+                  const { imported } = await batchImport(csvText.trim());
+                  toast.push(`Imported ${imported} assets`, 'success');
+                  setCsvText('');
+                  load(true);
+                } catch (e:any) {
+                  toast.push('Import failed', 'error');
+                }
+            }} className="bg-indigo-600 px-3 py-2 rounded">Upload</button>
+          </>
+        )}
         <button onClick={async () => {
           try {
             // Fetch all assets ignoring pagination (iterate pages)
@@ -282,28 +299,59 @@ export const ConfigPage: React.FC = () => {
             ) : (
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
                 <div className="flex-1">
-                  <div className="font-semibold tracking-wide">{a.name} <span className="text-xs opacity-60">({a.symbol})</span></div>
+                  <div className="flex items-center gap-2">
+                    <div className="font-semibold tracking-wide">{a.name} <span className="text-xs opacity-60">({a.symbol})</span></div>
+                    {a.isGlobal ? (
+                      <span className="text-[10px] px-2 py-0.5 bg-emerald-600/20 text-emerald-400 rounded-full border border-emerald-600/30">
+                        GLOBAL
+                      </span>
+                    ) : (
+                      <span className="text-[10px] px-2 py-0.5 bg-indigo-600/20 text-indigo-400 rounded-full border border-indigo-600/30">
+                        USER
+                      </span>
+                    )}
+                  </div>
                   <div className="text-xs opacity-60">Provider: {a.providerSymbol}</div>
                   <div className="text-[10px] opacity-60 flex gap-2">Upper: {a.upperThreshold ?? '—'} | Lower: {a.lowerThreshold ?? '—'}</div>
+                  {a.userId && (
+                    <div className="text-[10px] opacity-50">Created by: {a.userId.name}</div>
+                  )}
                 </div>
                 <div className="flex items-center gap-3 text-xs">
-                  <button
-                    onClick={() => {
-                      setEditingId(a._id);
-                      setEditingOriginal(a);
-                      setEditForm({
-                        name: a.name || '',
-                        symbol: a.symbol || '',
-                        providerSymbol: a.providerSymbol || '',
-                        upperThreshold: a.upperThreshold != null ? String(a.upperThreshold) : undefined,
-                        lowerThreshold: a.lowerThreshold != null ? String(a.lowerThreshold) : undefined,
-                      });
-                      setEditSymbolDup(false);
-                      setEditProviderDup(false);
-                    }}
-                    className="text-indigo-400 hover:underline"
-                  >Edit</button>
-                  <button onClick={async () => { await deleteAsset(a._id); setAssets(prev => prev.filter(p => p._id !== a._id)); toast.push(`Deleted ${a.symbol}`, 'info'); }} className="text-rose-400 hover:underline">Delete</button>
+                  {isAuthenticated && !a.isGlobal && (
+                    <>
+                      <button
+                        onClick={() => {
+                          setEditingId(a._id);
+                          setEditingOriginal(a);
+                          setEditForm({
+                            name: a.name || '',
+                            symbol: a.symbol || '',
+                            providerSymbol: a.providerSymbol || '',
+                            upperThreshold: a.upperThreshold != null ? String(a.upperThreshold) : undefined,
+                            lowerThreshold: a.lowerThreshold != null ? String(a.lowerThreshold) : undefined,
+                          });
+                          setEditSymbolDup(false);
+                          setEditProviderDup(false);
+                        }}
+                        className="text-indigo-400 hover:underline"
+                      >Edit</button>
+                      <button 
+                        onClick={async () => { 
+                          await deleteAsset(a._id); 
+                          setAssets(prev => prev.filter(p => p._id !== a._id)); 
+                          toast.push(`Deleted ${a.symbol}`, 'info'); 
+                        }} 
+                        className="text-rose-400 hover:underline"
+                      >Delete</button>
+                    </>
+                  )}
+                  {a.isGlobal && (
+                    <span className="text-xs text-gray-500">Read-only</span>
+                  )}
+                  {!isAuthenticated && (
+                    <span className="text-xs text-gray-500">Login to manage assets</span>
+                  )}
                 </div>
               </div>
             )}

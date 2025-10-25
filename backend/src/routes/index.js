@@ -4,16 +4,23 @@ import { currentQuotes, assetHistory } from '../controllers/quote.controller.js'
 import { runCycle } from '../services/scheduler.service.js';
 import { alertEmitter } from '../events/alertEmitter.js';
 import { listAlerts } from '../controllers/alert.controller.js';
+import { logout, getUser } from '../controllers/auth.controller.js';
+import { requireAuth, optionalAuth } from '../middleware/auth.js';
 
 const router = Router();
 
 router.get('/health', (req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
 
-router.get('/assets', listAssets);
-router.post('/assets', createAsset);
-router.put('/assets/:id', updateAsset);
-router.delete('/assets/:id', deleteAsset);
-router.post('/assets/batch', batchImport);
+// Auth API routes (not OAuth flows)
+router.post('/auth/logout', logout);
+router.get('/auth/me', optionalAuth, getUser);
+
+// Asset routes - require authentication for modification, optional for viewing
+router.get('/assets', optionalAuth, listAssets);
+router.post('/assets', requireAuth, createAsset);
+router.put('/assets/:id', requireAuth, updateAsset);
+router.delete('/assets/:id', requireAuth, deleteAsset);
+router.post('/assets/batch', requireAuth, batchImport);
 
 router.get('/quotes/current', currentQuotes);
 router.get('/quotes/:id/history', assetHistory);
