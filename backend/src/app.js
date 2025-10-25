@@ -28,9 +28,11 @@ export function createApp() {
 
   // Register custom token for requestId used by correlation middleware
   morgan.token('rid', () => getRequestId() || '-');
+  // Register custom token for IP address
+  morgan.token('ip', (req) => req.ip);
 
   const morganMiddleware = morgan(
-    ':method :url :status :res[content-length] - :response-time ms rid=:rid',
+    ':ip - :method :url :status :res[content-length] - :response-time ms rid=:rid',
     { stream },
   );
 
