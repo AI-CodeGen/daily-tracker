@@ -71,7 +71,7 @@ export async function listAssets(req, res, next) {
         .limit(ps),
       Asset.countDocuments(filter),
     ]);
-    let response = res.json({
+    const responsePayload = {
       data: items,
       page: p,
       pageSize: ps,
@@ -80,9 +80,13 @@ export async function listAssets(req, res, next) {
       sortBy: sField,
       sortDir: direction === 1 ? 'asc' : 'desc',
       q: q || null,
-    });
-    Logger.info(`Listed assets: user=${req.user?._id || 'guest'} returned=${items.length} total=${total}. Detailed response: ${JSON.stringify(response)}`);
-    return response;
+    };
+    Logger.info(
+      `Listed assets: user=${
+        req.user?._id || 'guest'
+      } returned=${items.length} total=${total}. Detailed response: ${JSON.stringify(responsePayload)}`
+    );
+    return res.json(responsePayload);
   } catch (e) {
     Logger.error(`Error listing assets: ${e.message}`);
     next(e);

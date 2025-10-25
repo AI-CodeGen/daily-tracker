@@ -21,11 +21,11 @@ export async function fetchQuote(providerSymbol) {
     case "SILVER":
       return fetchSilverPrice_MoneyControl();
     default:
-      return fetchMarketQuotes();
+      return fetchMarketQuotes(providerSymbol);
   }
 }
 
-export async function fetchMarketQuotes() {
+export async function fetchMarketQuotes(providerSymbol) {
     const provider = process.env.MARKET_FINANCIAL_DATA_PROVIDER;
     Logger.info(`Using ${provider} to fetch quotes.`);
     if (provider === "YAHOO_FINANCE") {

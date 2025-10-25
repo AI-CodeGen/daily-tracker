@@ -22,7 +22,7 @@ router.put('/assets/:id', requireAuth, updateAsset);
 router.delete('/assets/:id', requireAuth, deleteAsset);
 router.post('/assets/batch', requireAuth, batchImport);
 
-router.get('/quotes/current', currentQuotes);
+router.get('/quotes/current', optionalAuth, currentQuotes);
 router.get('/quotes/:id/history', assetHistory);
 router.get('/alerts/history', listAlerts);
 
