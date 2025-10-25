@@ -1,4 +1,5 @@
-import React, { useState, Suspense } from 'react';
+import React, { useState, Suspense, useEffect } from 'react';
+import ReactGA from 'react-ga4';
 import { AuthProvider } from './context/AuthContext';
 import { UserProfile } from './components/UserProfile';
 import { Dashboard } from './pages/Dashboard';
@@ -13,6 +14,18 @@ const tabs = [
 
 const App: React.FC = () => {
   const [tab, setTab] = useState('dashboard');
+
+  useEffect(() => {
+    const currentTab = tabs.find(t => t.id === tab);
+    if (ReactGA.isInitialized && currentTab) {
+      ReactGA.send({
+        hitType: "pageview",
+        page: `/${tab}`,
+        title: currentTab.label,
+      });
+    }
+  }, [tab]);
+
   return (
     <AuthProvider>
       <div className="max-w-7xl mx-auto p-6 space-y-6">
