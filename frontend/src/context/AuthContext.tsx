@@ -36,7 +36,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   useEffect(() => {
     checkAuthStatus();
-    
+
     // Check for auth success/error in URL params
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('auth') === 'success') {
@@ -77,6 +77,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Force logout even if API call fails
       setUser(null);
     }
+    // reload the page to reset any state after logout
+    window.location.reload();
   };
 
   const value: AuthContextType = {
