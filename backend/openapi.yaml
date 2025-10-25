@@ -207,6 +207,61 @@ paths:
                 type: object
                 properties:
                   success: { type: boolean }
+  /admin/rate-limits/{endpoint}:
+    get:
+      summary: Get rate limit configuration for an endpoint
+      tags: [Admin]
+      parameters:
+        - in: path
+          name: endpoint
+          required: true
+          schema: { type: string }
+          example: /assets
+      responses:
+        '200':
+          description: Rate limit configuration
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  data:
+                    $ref: '#/components/schemas/RateLimit'
+    put:
+      summary: Update or create rate limit configuration for an endpoint
+      tags: [Admin]
+      parameters:
+        - in: path
+          name: endpoint
+          required: true
+          schema: { type: string }
+          example: /assets
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RateLimitUpdate'
+            examples:
+              default:
+                value:
+                  perMinute: 100
+                  perHour: 2000
+                  perDay: 10000
+      responses:
+        '200':
+          description: Updated rate limit configuration
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  data:
+                    $ref: '#/components/schemas/RateLimit'
 components:
   schemas:
     Asset:
@@ -250,3 +305,16 @@ components:
         price: { type: number }
         threshold: { type: number }
         triggeredAt: { type: string, format: date-time }
+    RateLimit:
+      type: object
+      properties:
+        endpoint: { type: string, example: /assets }
+        perMinute: { type: integer, example: 100 }
+        perHour: { type: integer, example: 2000 }
+        perDay: { type: integer, example: 10000 }
+    RateLimitUpdate:
+      type: object
+      properties:
+        perMinute: { type: integer, example: 100 }
+        perHour: { type: integer, example: 2000 }
+        perDay: { type: integer, example: 10000 }
