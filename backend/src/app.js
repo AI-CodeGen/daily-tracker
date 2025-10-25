@@ -6,6 +6,7 @@ import morgan from 'morgan';
 import session from 'express-session';
 import router from './routes/index.js';
 import authRoutes from './routes/auth.js';
+import adminRoutes from './routes/admin.routes.js';
 import { errorHandler } from './middleware/error.js';
 import swaggerUi from 'swagger-ui-express';
 import fs from 'fs';
@@ -66,7 +67,7 @@ export function createApp() {
     },
     credentials: true
   }));
-  app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 500 }));
+  
   // Swagger UI (read once, cache in memory) with resilient path resolution
   try {
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -97,6 +98,8 @@ export function createApp() {
   
   // Mount other API routes under /api
   app.use('/api', router);
+  app.use('/api/admin', adminRoutes);
+
   app.use(errorHandler);
   return app;
 }

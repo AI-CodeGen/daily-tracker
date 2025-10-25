@@ -6,8 +6,11 @@ import { alertEmitter } from '../events/alertEmitter.js';
 import { listAlerts } from '../controllers/alert.controller.js';
 import { logout, getUser } from '../controllers/auth.controller.js';
 import { requireAuth, optionalAuth } from '../middleware/auth.js';
+import { dynamicRateLimiter } from '../middleware/rateLimiter.js';
 
 const router = Router();
+
+router.use(dynamicRateLimiter);
 
 router.get('/health', (req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
 
