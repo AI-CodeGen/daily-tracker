@@ -7,10 +7,14 @@ import { listAlerts } from '../controllers/alert.controller.js';
 import { logout, getUser } from '../controllers/auth.controller.js';
 import { requireAuth, optionalAuth } from '../middleware/auth.js';
 import { rateLimiters } from '../middleware/rateLimiter.js';
+import masterAssetRoutes from './masterAsset.routes.js';
 
 const router = Router();
 
 router.get('/health', (req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
+
+// Public route for master assets
+router.use('/master-assets', masterAssetRoutes);
 
 // Auth API routes (not OAuth flows)
 router.post('/auth/logout', ...rateLimiters, logout);
