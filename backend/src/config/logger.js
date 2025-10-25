@@ -42,30 +42,38 @@ const attachRequestId = winston.format((info) => {
   return info;
 });
 
-const baseFormat = winston.format.printf((info) => {
-  const ridPart = info.requestId ? ` (rid=${info.requestId})` : '';
-  return `${info.timestamp} [${info.label}]${ridPart} ${info.level}: ${info.message}`;
-});
+// The new base format for all transports, outputting structured JSON.
+const jsonFormat = winston.format.combine(
+  winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss:ms" }),
+  attachRequestId(),
+  ensureLabel(),
+  winston.format.json()
+);
+
+// The old format for human-readable console output. Kept for reference.
+/*
+const consoleFormat = winston.format.combine(
+  winston.format.colorize({ all: true }),
+  winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss:ms" }),
+  attachRequestId(),
+  ensureLabel(),
+  winston.format.printf((info) => {
+    const ridPart = info.requestId ? ` (rid=${info.requestId})` : '';
+    return `${info.timestamp} [${info.label}]${ridPart} ${info.level}: ${info.message}`;
+  })
+);
+*/
 
 // Parent logger (no hard-coded label; fallback handled by ensureLabel())
 const parentLogger = winston.createLogger({
   levels,
   level: level(),
-  format: winston.format.combine(
-    winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss:ms" }),
-    attachRequestId(),
-    ensureLabel(),
-    baseFormat
-  ),
+  format: jsonFormat, // Use JSON format for all transports by default
   transports: [
     new winston.transports.Console({
-      format: winston.format.combine(
-        winston.format.colorize({ all: true }),
-        winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss:ms" }),
-        attachRequestId(),
-        ensureLabel(),
-        baseFormat
-      ),
+      // To switch back to colorized console logs for local dev,
+      // comment out the line below and uncomment the 'consoleFormat' block above.
+      // format: consoleFormat,
     }),
     new winston.transports.File({ filename: "logs/error.log", level: "error" }),
     new winston.transports.File({ filename: "logs/all.log" }),
