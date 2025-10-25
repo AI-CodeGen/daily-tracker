@@ -1,7 +1,7 @@
 import express from 'express';
 import { getRateLimit, upsertRateLimit } from '../controllers/rateLimit.controller.js';
 import { requireAuth, admin } from '../middleware/auth.js';
-import { dynamicRateLimiter } from '../middleware/rateLimiter.js';
+import { rateLimiters } from '../middleware/rateLimiter.js';
 
 const router = express.Router();
 
@@ -10,7 +10,7 @@ router.use(requireAuth, admin);
 
 router
   .route('/rate-limits/:endpoint')
-  .get(dynamicRateLimiter, getRateLimit)
-  .put(dynamicRateLimiter, upsertRateLimit);
+  .get(...rateLimiters, getRateLimit)
+  .put(...rateLimiters, upsertRateLimit);
 
 export default router;

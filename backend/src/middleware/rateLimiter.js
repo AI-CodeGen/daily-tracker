@@ -1,3 +1,5 @@
+import dotenv from 'dotenv';
+dotenv.config();
 import rateLimit from 'express-rate-limit';
 import MongoStore from 'rate-limit-mongo';
 import RateLimit from '../models/RateLimit.js';
@@ -5,7 +7,7 @@ import Logger from '../config/logger.js';
 
 // In-memory cache for rate limit configurations to reduce DB queries
 const limitCache = new Map();
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL = 60 * 60 * 1000; // 1 hour
 
 const getMongoUrl = () => {
   if (!process.env.MONGO_URI) {
@@ -26,8 +28,11 @@ const keyGenerator = (req) => {
 
 // Fetches rate limit settings from DB or cache
 const getRateLimitConfig = async (endpoint) => {
-  if (limitCache.has(endpoint)) {
-    return limitCache.get(endpoint);
+  const now = Date.now();
+  const cached = limitCache.get(endpoint);
+
+  if (cached && now < cached.expiry) {
+    return cached.data;
   }
 
   let config = await RateLimit.findOne({ endpoint }).lean();
@@ -42,57 +47,52 @@ const getRateLimitConfig = async (endpoint) => {
     Logger.info(`No rate limit config found for ${endpoint}. Created with default values.`);
   }
 
-  limitCache.set(endpoint, config);
-  // Invalidate cache entry after TTL
-  setTimeout(() => limitCache.delete(endpoint), CACHE_TTL);
+  limitCache.set(endpoint, { data: config, expiry: now + CACHE_TTL });
+
+  // Ensure the cache entry is deleted after the TTL to prevent memory leaks
+  setTimeout(() => {
+    limitCache.delete(endpoint);
+    Logger.debug(`Cache expired and deleted for endpoint: ${endpoint}`);
+  }, CACHE_TTL);
 
   return config;
 };
 
-const createLimiter = (windowMs, max, suffix) => {
+const createLimiter = (windowMs, limitFn, collectionSuffix) => {
   return rateLimit({
     store: new MongoStore({
       uri: getMongoUrl(),
-      collectionName: `rate_limits_${suffix}`,
+      collectionName: `rate_limits_${collectionSuffix}`,
       expireTimeMs: windowMs,
-      errorHandler: (err) => Logger.error(`Rate limit store error (${suffix}):`, err),
+      errorHandler: (err) => Logger.error(`Rate limit store error (${collectionSuffix}):`, err),
     }),
     windowMs,
-    max,
+    // The `limit` property is a function that dynamically resolves the limit.
+    limit: async (req) => {
+      try {
+        const endpoint = req.route.path;
+        const config = await getRateLimitConfig(endpoint);
+        return limitFn(config);
+      } catch (error) {
+        Logger.error('Failed to resolve rate limit:', { error });
+        // Fallback to a safe default if config lookup fails
+        return 60;
+      }
+    },
     keyGenerator,
     handler: (req, res, next, options) => {
       res.status(options.statusCode).json({
         success: false,
-        message: `Too many requests, please try again after ${Math.ceil(options.windowMs / 60000)} minutes.`,
+        message: `Too many requests for this time window. Please try again later.`,
+        limit: options.limit,
+        window: `${options.windowMs / 1000}s`,
       });
     },
   });
 };
 
-export const dynamicRateLimiter = async (req, res, next) => {
-  try {
-    // Use req.route.path to get the route pattern (e.g., '/assets/:id') instead of the full URL
-    const endpoint = req.route.path;
-    if (!endpoint) {
-      return next(); // Not a matched route, skip
-    }
+const minuteLimiter = createLimiter(1 * 60 * 1000, (config) => config.perMinute, 'minute');
+const hourLimiter = createLimiter(60 * 60 * 1000, (config) => config.perHour, 'hour');
+const dayLimiter = createLimiter(24 * 60 * 60 * 1000, (config) => config.perDay, 'day');
 
-    const config = await getRateLimitConfig(endpoint);
-
-    const minuteLimiter = createLimiter(1 * 60 * 1000, config.perMinute, 'minute');
-    const hourLimiter = createLimiter(60 * 60 * 1000, config.perHour, 'hour');
-    const dayLimiter = createLimiter(24 * 60 * 60 * 1000, config.perDay, 'day');
-
-    // Chain the limiters. If one fails, the request is terminated.
-    minuteLimiter(req, res, (err) => {
-      if (err) return next(err);
-      hourLimiter(req, res, (err) => {
-        if (err) return next(err);
-        dayLimiter(req, res, next);
-      });
-    });
-  } catch (error) {
-    Logger.error('Error in dynamic rate limiter:', error);
-    next(error);
-  }
-};
+export const rateLimiters = [minuteLimiter, hourLimiter, dayLimiter];
