@@ -12,14 +12,18 @@ services:
       - "4000:4000"
     networks:
       - application-network
+    command: ["/bin/sh", "-c", "/wait-for.sh 192.168.29.71 27017 60 && node src/index.js"]
+
   dailytracker-frontend:
     build: ./frontend
     container_name: dailytracker-frontend
     restart: unless-stopped
+    env_file:
+      - ./frontend/.env
     depends_on:
       - dailytracker-backend
     ports:
-      - "5173:5173"
+      - "5173:80"
     networks:
       - application-network
 
