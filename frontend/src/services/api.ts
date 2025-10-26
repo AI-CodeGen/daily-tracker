@@ -70,6 +70,11 @@ export async function getAlertHistory(params: AlertHistoryQuery = {}) {
   return data as { data: any[]; page: number; pageSize: number; total: number; totalPages: number };
 }
 
+export async function searchMasterAssets(q: string): Promise<Asset[]> {
+  const { data } = await client.get('/master-assets/search', { params: { q } });
+  return data;
+}
+
 export async function triggerFetchNow(): Promise<{ success: boolean }> {
   const { data } = await client.post('/admin/fetch-now');
   return data;

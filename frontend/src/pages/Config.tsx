@@ -1,12 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { createAsset, deleteAsset, getAssets, updateAsset, checkDuplicateSymbol, batchImport } from '../services/api';
+import React, { useEffect, useState, useRef } from 'react';
+import { createAsset, deleteAsset, getAssets, updateAsset, checkDuplicateSymbol, batchImport, searchMasterAssets } from '../services/api';
 import { useToast } from '../components/ToastProvider';
 import { useAuth } from '../context/AuthContext';
-import type { Asset } from '../types';
-import { AssetForm } from '../components/AssetForm';
+import type { Asset, User } from '../types';
 
 export const ConfigPage: React.FC = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -18,13 +17,21 @@ export const ConfigPage: React.FC = () => {
   const [query, setQuery] = useState('');
   const toast = useToast();
   const [csvText, setCsvText] = useState('');
-  const [dupWarning, setDupWarning] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<{ name: string; symbol: string; providerSymbol: string; upperThreshold?: string; lowerThreshold?: string }>({ name: '', symbol: '', providerSymbol: '' });
   const [editLoading, setEditLoading] = useState(false);
   const [editSymbolDup, setEditSymbolDup] = useState(false);
   const [editProviderDup, setEditProviderDup] = useState(false);
   const [editingOriginal, setEditingOriginal] = useState<Asset | null>(null);
+
+  // New state for master asset search
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState<Asset[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [selectedMasterAsset, setSelectedMasterAsset] = useState<Asset | null>(null);
+  const [newAssetThresholds, setNewAssetThresholds] = useState<{ upper?: string, lower?: string }>({});
+  const [isAdding, setIsAdding] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
 
   async function load(resetPage = false) {
     setLoading(true);
@@ -48,14 +55,80 @@ export const ConfigPage: React.FC = () => {
 
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [page, sortBy, sortDir, pageSize]);
 
-  // Debounced search
+  // Debounced search for query filter
   useEffect(() => {
     const id = setTimeout(() => { load(true); }, 400);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
 
-  // Inline duplicate symbol check (on symbol field change) handled in AssetForm? We'll add here by intercepting create.
+  // Debounced search for master assets
+  useEffect(() => {
+    if (searchTerm.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+
+    const handleSearch = async () => {
+      setIsSearching(true);
+      try {
+        const results = await searchMasterAssets(searchTerm.trim());
+        setSearchResults(results);
+      } catch (e) {
+        toast.push('Failed to search for assets', 'error');
+      } finally {
+        setIsSearching(false);
+      }
+    };
+
+    const debounceId = setTimeout(handleSearch, 500);
+    return () => clearTimeout(debounceId);
+  }, [searchTerm, toast]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setSearchResults([]);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+
+  const handleSelectMasterAsset = (asset: Asset) => {
+    setSelectedMasterAsset(asset);
+    setSearchTerm('');
+    setSearchResults([]);
+  };
+
+  const handleAddNewAsset = async () => {
+    if (!selectedMasterAsset || !user) return;
+    setIsAdding(true);
+    try {
+      const payload: Partial<Asset> & { userId?: string } = {
+        name: selectedMasterAsset.name,
+        symbol: selectedMasterAsset.symbol,
+        providerSymbol: selectedMasterAsset.providerSymbol,
+        unit: selectedMasterAsset.unit,
+        currency: selectedMasterAsset.currency,
+        isGlobal: false, // User-added assets are not global
+        upperThreshold: newAssetThresholds.upper ? Number(newAssetThresholds.upper) : undefined,
+        lowerThreshold: newAssetThresholds.lower ? Number(newAssetThresholds.lower) : undefined,
+        userId: (user as User & { _id: string })._id,
+      };
+      const created = await createAsset(payload);
+      toast.push(`Added ${created.symbol}`, 'success');
+      setSelectedMasterAsset(null);
+      setNewAssetThresholds({});
+      load(true);
+    } catch (e) {
+      toast.push('Failed to add asset', 'error');
+    } finally {
+      setIsAdding(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -68,23 +141,82 @@ export const ConfigPage: React.FC = () => {
         )}
       </div>
       {isAuthenticated && (
-        <>
-          <AssetForm onCreate={async a => {
-            const symbol = a.symbol || '';
-            const dup = await checkDuplicateSymbol(symbol);
-            if (dup.exists) {
-              setDupWarning(`Symbol ${symbol} already exists`);
-              toast.push(`Duplicate symbol: ${symbol}`, 'error');
-              throw new Error('Duplicate');
-            }
-            setDupWarning(null);
-            const created = await createAsset(a);
-            toast.push(`Added ${created.symbol}`, 'success');
-            load(true);
-            return created;
-          }} />
-          {dupWarning && <div className="text-xs text-rose-400">{dupWarning}</div>}
-        </>
+        <div className="bg-gray-900 rounded p-4 space-y-3">
+          <h3 className="font-semibold">Add New Asset</h3>
+          <div className="flex flex-wrap items-start gap-3">
+            <div className="flex flex-col" ref={searchRef}>
+              <label className="text-xs uppercase tracking-wide">Search Asset Name/Symbol</label>
+              <div className="relative">
+                <input
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  placeholder="e.g., Bitcoin or BTC (min 2 chars)"
+                  className="bg-gray-800 px-2 py-1 rounded w-96 pr-8"
+                />
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 absolute right-2 top-1/2 -translate-y-1/2 text-gray-500" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+                </svg>
+              </div>
+              {isSearching && <div className="text-xs text-gray-400 mt-1">Searching...</div>}
+              {searchResults.length > 0 && (
+                <div className="absolute z-10 mt-14 w-96 bg-gray-800 border border-gray-700 rounded shadow-lg max-h-60 overflow-y-auto">
+                  {searchResults.map(asset => (
+                    <div
+                      key={asset._id}
+                      onClick={() => handleSelectMasterAsset(asset)}
+                      className="px-3 py-2 hover:bg-indigo-600 cursor-pointer text-sm"
+                    >
+                      {asset.name} ({asset.symbol})
+                    </div>
+                  ))}
+                </div>
+              )}
+               {searchTerm.length > 1 && !isSearching && searchResults.length === 0 && (
+                <div className="absolute z-10 mt-14 w-96 bg-gray-800 border border-gray-700 rounded shadow-lg">
+                   <div className="px-3 py-2 text-sm text-gray-400">No new assets found.</div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {selectedMasterAsset && (
+            <div className="border-t border-gray-700 pt-3 mt-3 space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                <div><span className="font-semibold">Name:</span> {selectedMasterAsset.name}</div>
+                <div><span className="font-semibold">Symbol:</span> {selectedMasterAsset.symbol}</div>
+                <div><span className="font-semibold">Provider:</span> {selectedMasterAsset.providerSymbol}</div>
+              </div>
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="flex flex-col">
+                  <label className="text-xs uppercase tracking-wide">Upper Threshold</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={newAssetThresholds.upper || ''}
+                    onChange={e => setNewAssetThresholds(t => ({ ...t, upper: e.target.value }))}
+                    className="bg-gray-800 px-2 py-1 rounded w-28"
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <label className="text-xs uppercase tracking-wide">Lower Threshold</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={newAssetThresholds.lower || ''}
+                    onChange={e => setNewAssetThresholds(t => ({ ...t, lower: e.target.value }))}
+                    className="bg-gray-800 px-2 py-1 rounded w-28"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={handleAddNewAsset} disabled={isAdding} className="bg-emerald-600 px-4 py-1 rounded text-sm disabled:opacity-50">
+                    {isAdding ? 'Adding...' : 'Add Asset'}
+                  </button>
+                  <button onClick={() => setSelectedMasterAsset(null)} className="bg-gray-700 px-3 py-1 rounded text-sm">Cancel</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       )}
       <div className="flex flex-wrap gap-4 items-end text-xs">
         <div className="flex flex-col">

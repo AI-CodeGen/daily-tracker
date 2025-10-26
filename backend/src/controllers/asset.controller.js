@@ -5,12 +5,13 @@ const Logger = createLogger(import.meta.url);
 
 const assetSchema = Joi.object({
   name: Joi.string().required(),
-  symbol: Joi.string().alphanum().min(2).max(12).required(),
+  symbol: Joi.string().min(2).max(12).required(),
   providerSymbol: Joi.string().required(),
   unit: Joi.string().optional().allow(''),
   currency: Joi.string().trim().length(3).uppercase().optional(),
   upperThreshold: Joi.number().optional().allow(null),
   lowerThreshold: Joi.number().optional().allow(null),
+  isGlobal: Joi.boolean().default(false)
 });
 
 // GET /api/assets
@@ -109,7 +110,7 @@ export async function createAsset(req, res, next) {
     }
 
     // Add user ownership
-    value.userId = req.user._id;
+    value.userId = req.user._id; // User Id is added in here
     value.isGlobal = false; // User assets are not global by default
 
     const asset = await Asset.create(value);
