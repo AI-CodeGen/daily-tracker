@@ -42,6 +42,11 @@ const attachRequestId = winston.format((info) => {
   return info;
 });
 
+// Filter for http level only
+const httpFilter = winston.format((info) => {
+  return info.level === 'http' ? info : false;
+});
+
 // The new base format for all transports, outputting structured JSON.
 const jsonFormat = winston.format.combine(
   winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss:ms" }),
@@ -77,6 +82,11 @@ const parentLogger = winston.createLogger({
     }),
     new winston.transports.File({ filename: "logs/error.log", level: "error" }),
     new winston.transports.File({ filename: "logs/all.log" }),
+    new winston.transports.File({
+      filename: "logs/http.log",
+      level: "http",
+      format: winston.format.combine(httpFilter(), jsonFormat),
+    }),
   ],
 });
 
