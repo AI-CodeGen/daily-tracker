@@ -1,41 +1,29 @@
 services:
-  mongo:
-    image: mongo:6
-    container_name: dt-mongo
-    restart: unless-stopped
-    volumes:
-      - mongo_data:/data/db
-    ports:
-      - "27018:27017"
-    networks:
-      - dt-network
-  backend:
+
+  dailytracker-backend:
     build: ./backend
-    container_name: dt-backend
+    container_name: dailytracker-backend
     restart: unless-stopped
     env_file:
       - ./backend/.env
     environment:
-      - MONGO_URI=mongodb://mongo:27017/dailytracker
-    depends_on:
-      - mongo
+      - MONGO_URI=mongodb://admin:adminpassword@192.168.29.71:27017/?authSource=admin/dailytracker
     ports:
       - "4000:4000"
     networks:
-      - dt-network
-  frontend:
+      - application-network
+  dailytracker-frontend:
     build: ./frontend
-    container_name: dt-frontend
+    container_name: dailytracker-frontend
     restart: unless-stopped
     depends_on:
-      - backend
+      - dailytracker-backend
     ports:
-      - "5173:80"
+      - "5173:5173"
     networks:
-      - dt-network
-volumes:
-  mongo_data:
+      - application-network
+
 networks:
-  dt-network:
-    name: dt-network
-    driver: bridge
+  application-network:
+    external: true
+      
