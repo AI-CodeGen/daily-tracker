@@ -7,7 +7,7 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      - MONGO_URI=mongodb://admin:adminpassword@192.168.29.71:27017/?authSource=admin/dailytracker
+      - MONGO_URI=mongodb://admin:adminpassword@192.168.29.71:27017/dailytracker?authSource=admin
     ports:
       - "4000:4000"
     networks:
