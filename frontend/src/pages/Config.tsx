@@ -16,7 +16,6 @@ export const ConfigPage: React.FC = () => {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [query, setQuery] = useState('');
   const toast = useToast();
-  const [csvText, setCsvText] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<{ name: string; symbol: string; providerSymbol: string; upperThreshold?: string; lowerThreshold?: string }>({ name: '', symbol: '', providerSymbol: '' });
   const [editLoading, setEditLoading] = useState(false);
@@ -32,6 +31,7 @@ export const ConfigPage: React.FC = () => {
   const [newAssetThresholds, setNewAssetThresholds] = useState<{ upper?: string, lower?: string }>({});
   const [isAdding, setIsAdding] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
+  const [csvFile, setCsvFile] = useState<File | null>(null);
 
   async function load(resetPage = false) {
     setLoading(true);
@@ -116,7 +116,7 @@ export const ConfigPage: React.FC = () => {
         isGlobal: false, // User-added assets are not global
         upperThreshold: newAssetThresholds.upper ? Number(newAssetThresholds.upper) : undefined,
         lowerThreshold: newAssetThresholds.lower ? Number(newAssetThresholds.lower) : undefined,
-        userId: (user as User & { _id: string })._id,
+        userId: user.id as any, // Cast to any to satisfy the type mismatch for the API call
       };
       const created = await createAsset(payload);
       toast.push(`Added ${created.symbol}`, 'success');
@@ -239,23 +239,53 @@ export const ConfigPage: React.FC = () => {
           <input value={query} onChange={e => setQuery(e.target.value)} placeholder="name/symbol" className="bg-gray-800 px-2 py-1 rounded w-40" />
         </div>
         {isAuthenticated && (
-          <>
-            <div className="flex flex-col w-64">
-              <label className="uppercase tracking-wide">Batch CSV</label>
-              <textarea value={csvText} onChange={e => setCsvText(e.target.value)} rows={3} placeholder="name,symbol,providerSymbol,upperThreshold,lowerThreshold" className="bg-gray-800 px-2 py-1 rounded resize-y" />
+          <div className="flex items-end gap-2">
+            <div className="flex flex-col">
+              <label className="uppercase tracking-wide">Batch Asset Upload (CSV)</label>
+              <input
+                id="csv-upload-input"
+                type="file"
+                accept=".csv"
+                onChange={e => {
+                  const file = e.target.files ? e.target.files[0] : null;
+                  if (file) {
+                    if (file.type !== 'text/csv') {
+                      toast.push('Invalid file type. Please upload a CSV file.', 'error');
+                      setCsvFile(null);
+                      const fileInput = document.getElementById('csv-upload-input') as HTMLInputElement;
+                      if (fileInput) fileInput.value = '';
+                    } else {
+                      setCsvFile(file);
+                    }
+                  } else {
+                    setCsvFile(null);
+                  }
+                }}
+                className="text-xs file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-gray-700 file:text-gray-300 hover:file:bg-gray-600"
+              />
             </div>
             <button onClick={async () => {
-              if (!csvText.trim()) return;
+              if (!csvFile) {
+                toast.push('Please select a CSV file', 'info');
+                return;
+              }
+              if (csvFile.size > 1024 * 1024) {
+                toast.push('File size exceeds 1MB', 'error');
+                return;
+              }
               try {
-                const { imported } = await batchImport(csvText.trim());
+                const text = await csvFile.text();
+                const { imported } = await batchImport(text);
                 toast.push(`Imported ${imported} assets`, 'success');
-                setCsvText('');
+                setCsvFile(null);
+                const fileInput = document.getElementById('csv-upload-input') as HTMLInputElement;
+                if (fileInput) fileInput.value = '';
                 load(true);
               } catch (e: any) {
                 toast.push('Import failed', 'error');
               }
-            }} className="bg-indigo-600 px-3 py-2 rounded">Batch Asset Upload (CSV)</button>
-          </>
+            }} disabled={!csvFile} className="bg-indigo-600 px-3 py-2 rounded disabled:opacity-50">Upload CSV</button>
+          </div>
         )}
         {isAuthenticated && (
           <button onClick={async () => {

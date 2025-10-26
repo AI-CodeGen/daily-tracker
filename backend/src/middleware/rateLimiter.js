@@ -95,4 +95,12 @@ const minuteLimiter = createLimiter(1 * 60 * 1000, (config) => config.perMinute,
 const hourLimiter = createLimiter(60 * 60 * 1000, (config) => config.perHour, 'hour');
 const dayLimiter = createLimiter(24 * 60 * 60 * 1000, (config) => config.perDay, 'day');
 
-export const rateLimiters = [minuteLimiter, hourLimiter, dayLimiter];
+export const rateLimiters = (req, res, next) => {
+  minuteLimiter(req, res, (err) => {
+    if (err) return next(err);
+    hourLimiter(req, res, (err) => {
+      if (err) return next(err);
+      dayLimiter(req, res, next);
+    });
+  });
+};

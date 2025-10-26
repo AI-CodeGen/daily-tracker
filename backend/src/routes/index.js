@@ -17,22 +17,22 @@ router.get('/health', (req, res) => res.json({ status: 'ok', time: new Date().to
 router.use('/master-assets', masterAssetRoutes);
 
 // Auth API routes (not OAuth flows)
-router.post('/auth/logout', ...rateLimiters, logout);
-router.get('/auth/me', ...rateLimiters, optionalAuth, getUser);
+router.post('/auth/logout', rateLimiters, logout);
+router.get('/auth/me', rateLimiters, optionalAuth, getUser);
 
 // Asset routes - require authentication for modification, optional for viewing
-router.get('/assets', ...rateLimiters, optionalAuth, listAssets);
-router.post('/assets', ...rateLimiters, requireAuth, createAsset);
-router.put('/assets/:id', ...rateLimiters, requireAuth, updateAsset);
-router.delete('/assets/:id', ...rateLimiters, requireAuth, deleteAsset);
-router.post('/assets/batch', ...rateLimiters, requireAuth, batchImport);
+router.get('/assets', rateLimiters, optionalAuth, listAssets);
+router.post('/assets', rateLimiters, requireAuth, createAsset);
+router.put('/assets/:id', rateLimiters, requireAuth, updateAsset);
+router.delete('/assets/:id', rateLimiters, requireAuth, deleteAsset);
+router.post('/assets/batch', rateLimiters, requireAuth, batchImport);
 
-router.get('/quotes/current', ...rateLimiters, optionalAuth, currentQuotes);
-router.get('/quotes/:id/history', ...rateLimiters, assetHistory);
-router.get('/alerts/history', ...rateLimiters, listAlerts);
+router.get('/quotes/current', rateLimiters, optionalAuth, currentQuotes);
+router.get('/quotes/:id/history', rateLimiters, assetHistory);
+router.get('/alerts/history', rateLimiters, listAlerts);
 
 // Dev utility: trigger immediate fetch cycle (guarded by NODE_ENV check)
-router.post('/admin/fetch-now', ...rateLimiters, async (req, res) => {
+router.post('/admin/fetch-now', rateLimiters, async (req, res) => {
 	if (process.env.NODE_ENV === 'production') {
 		return res.status(403).json({ message: 'Forbidden' });
 	}

@@ -16,16 +16,16 @@ router.use(requireAuth, admin);
 
 router
   .route('/rate-limits/:endpoint')
-  .get(...rateLimiters, getRateLimit)
-  .put(...rateLimiters, upsertRateLimit);
+  .get(rateLimiters, getRateLimit)
+  .put(rateLimiters, upsertRateLimit);
 
 // Master asset management routes
 router.route('/master-assets')
-  .get(...rateLimiters, getMasterAssets)
-  .post(...rateLimiters, createMasterAsset);
+  .get(rateLimiters, getMasterAssets)
+  .post(rateLimiters, createMasterAsset);
 
 router.route('/master-assets/:id')
-  .put(...rateLimiters, updateMasterAsset)
-  .delete(...rateLimiters, deleteMasterAsset);
+  .put(rateLimiters, updateMasterAsset)
+  .delete(rateLimiters, deleteMasterAsset);
 
 export default router;

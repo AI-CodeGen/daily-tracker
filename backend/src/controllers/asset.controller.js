@@ -214,6 +214,7 @@ export async function batchImport(req, res, next) {
     Logger.info(`Batch import completed for user=${req.user._id}, created=${created.length} assets. Detailed list: ${JSON.stringify(created)}`);
     res.status(201).json({ imported: created.length, items: created });
   } catch (e) {
+    Logger.error(`Batch import error for user=${req.user._id} with error: ${e.message}`);
     next(e);
   }
 }
