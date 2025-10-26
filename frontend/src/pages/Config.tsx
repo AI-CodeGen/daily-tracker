@@ -254,7 +254,7 @@ export const ConfigPage: React.FC = () => {
               } catch (e: any) {
                 toast.push('Import failed', 'error');
               }
-            }} className="bg-indigo-600 px-3 py-2 rounded">Upload</button>
+            }} className="bg-indigo-600 px-3 py-2 rounded">Batch Asset Upload (CSV)</button>
           </>
         )}
         {isAuthenticated && (
@@ -318,7 +318,7 @@ export const ConfigPage: React.FC = () => {
             } catch (err: any) {
               toast.push('Export failed', 'error');
             }
-          }} className="bg-indigo-600 px-3 py-2 rounded">Export Configurations</button>
+          }} className="bg-indigo-600 px-3 py-2 rounded">Export Asset Configurations</button>
         )}
       </div>
       {isAuthenticated && <div className="text-[10px] opacity-60 -mt-2">Export format matches import headers: name,symbol,providerSymbol,upperThreshold,lowerThreshold,unit,currency</div>}
