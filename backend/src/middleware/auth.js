@@ -9,6 +9,7 @@ export const requireAuth = async (req, res, next) => {
     const token = req.headers.authorization?.split(' ')[1] || req.session?.token;
     
     if (!token) {
+      Logger.warn('requireAuth - No authentication token provided');
       return res.status(401).json({ message: 'Authentication required' });
     }
 
@@ -16,13 +17,15 @@ export const requireAuth = async (req, res, next) => {
     const user = await User.findById(decoded.userId).select('-googleId');
     
     if (!user || !user.isActive) {
+      Logger.warn('requireAuth - Invalid or inactive user attempted to authenticate');
       return res.status(401).json({ message: 'Invalid or inactive user' });
     }
 
     req.user = user;
+    Logger.info(`requireAuth - User ${user.email} authenticated successfully`);
     next();
   } catch (error) {
-    Logger.error('Authentication error:', error);
+    Logger.error('requireAuth - Authentication error:', error);
     res.status(401).json({ message: 'Invalid token' });
   }
 };
@@ -38,11 +41,13 @@ export const optionalAuth = async (req, res, next) => {
       if (user && user.isActive) {
         req.user = user;
       }
+    } else {
+      Logger.warn('optionalAuth - No authentication token provided');
     }
-    
     next();
   } catch (error) {
     // Silent fail for optional auth
+    Logger.error('optionalAuth - Authentication error:', error);
     next();
   }
 };

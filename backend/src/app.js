@@ -1,3 +1,5 @@
+import dotenv from 'dotenv';
+dotenv.config();
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -50,7 +52,7 @@ export function createApp() {
     cookie: {
       secure: process.env.NODE_ENV === 'production',
       httpOnly: true,
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+      maxAge: (process.env.SESSION_TIMEOUT_HOURS || 4) * 60 * 60 * 1000 // 4 hours
     }
   }));
 
