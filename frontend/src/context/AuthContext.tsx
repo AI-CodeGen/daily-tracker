@@ -65,7 +65,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = () => {
     // Use the full backend URL for OAuth redirect since it's a browser redirect, not an API call
     const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000';
-    window.location.href = `${backendUrl}/auth/google`;
+    // To pick url from .env file - In Development
+    // window.location.href = `${backendUrl}/auth/google`;
+    // To pick url from browser address bar - In Production
+    window.location.href = `${window.location.origin}/auth/google`;
   };
 
   const logout = async () => {
