@@ -11,7 +11,8 @@ const assetSchema = Joi.object({
   currency: Joi.string().trim().length(3).uppercase().optional(),
   upperThreshold: Joi.number().optional().allow(null),
   lowerThreshold: Joi.number().optional().allow(null),
-  isGlobal: Joi.boolean().default(false)
+  isGlobal: Joi.boolean().default(false),
+  userId: Joi.string().optional() // Allow userId to be passed optionally
 });
 
 // GET /api/assets
@@ -109,8 +110,10 @@ export async function createAsset(req, res, next) {
       return res.status(400).json({ message: 'Symbol already exists' });
     }
 
-    // Add user ownership
-    value.userId = req.user._id; // User Id is added in here
+    // Add user ownership only if not provided in request body
+    if (!value.userId) {
+      value.userId = req.user._id; // User Id is added from authenticated user
+    }
     value.isGlobal = false; // User assets are not global by default
 
     const asset = await Asset.create(value);

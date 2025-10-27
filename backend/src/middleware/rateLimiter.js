@@ -96,6 +96,11 @@ const hourLimiter = createLimiter(60 * 60 * 1000, (config) => config.perHour, 'h
 const dayLimiter = createLimiter(24 * 60 * 60 * 1000, (config) => config.perDay, 'day');
 
 export const rateLimiters = (req, res, next) => {
+  // Skip rate limiting for OAuth callback routes to avoid double-counting issues
+  if (req.path === '/google/callback' || req.path.includes('/auth/google')) {
+    return next();
+  }
+
   minuteLimiter(req, res, (err) => {
     if (err) return next(err);
     hourLimiter(req, res, (err) => {
