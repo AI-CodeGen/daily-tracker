@@ -1,4 +1,5 @@
 import { createLogger } from "../config/logger.js";
+import AlertHistory from "../models/AlertHistory.js";
 const Logger = createLogger(import.meta.url);
 
 // GET /api/alerts/history?assetId=&symbol=&boundary=upper|lower&page=1&pageSize=20
